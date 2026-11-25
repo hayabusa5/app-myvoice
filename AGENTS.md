@@ -26,7 +26,13 @@ xcodebuild -project MyVoice.xcodeproj -scheme MyVoice -destination 'id=<UDID>' -
 xcrun devicectl device install app --device <UDID> build/Build/Products/Debug-iphoneos/MyVoice.app
 ```
 - 署名のチームは BLLFXPJGG7。2026-11-25の夜に本人がXcodeへサインインし、コマンドからも新しい権限(iCloudなど)のプロファイルを作れるようになった(それまでは「No Accounts」)ため、ワイルドカードのプロファイルで足りる権限だけにしている。App GroupやCloudKitを足すときは、Xcodeで一度ビルドしてプロファイルを作る
-- TestFlightは、アーカイブを `open` して Organizer から上げる(`-exportArchive` は失敗する)
+- TestFlight(App Store Connectのアプリ名「マイ音声入力」、SKU myvoice-001。2026-11-25登録)は、コマンドで上げられる:
+```bash
+xcodebuild -project MyVoice.xcodeproj -scheme MyVoice -configuration Release -destination 'generic/platform=iOS' -archivePath build/MyVoice.xcarchive -allowProvisioningUpdates archive
+xcodebuild -exportArchive -archivePath build/MyVoice.xcarchive -exportOptionsPlist build/export-upload.plist -exportPath build/export -allowProvisioningUpdates
+```
+  `build/export-upload.plist` は method `app-store-connect`・destination `upload`・teamID・自動署名。上げ直すときは `CURRENT_PROJECT_VERSION` を上げる。iPadの向きを4方向にしていないと上げられない(`UISupportedInterfaceOrientations~ipad`)
+- 家族に配るときは内部テスト(審査なし)。相手をApp Store Connectの「ユーザとアクセス」に追加し、内部テストのグループに入れる。APIキーは本人が相手用に別に発行して渡す(本人の判断)
 
 ## Mac版(`Mac/`)
 - Caps Lockを押している間だけ録音 → 離すと文字起こし・整形 → クリップボード経由で⌘Vを送ってカーソル位置に入れる(0.8秒後に元のクリップボードへ戻す)

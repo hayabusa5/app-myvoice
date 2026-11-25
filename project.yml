@@ -29,6 +29,14 @@ targets:
         NSMicrophoneUsageDescription: キーボードで話した声を文字にするために使います。
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # iPadは全方向にしないとApp Store Connectへ上げられない(マルチタスクの条件)
+        UISupportedInterfaceOrientations~ipad:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationPortraitUpsideDown
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        # 通信はHTTPSだけなので、輸出規制の暗号化には当たらない
+        ITSAppUsesNonExemptEncryption: false
         # キーボードの歯車ボタンから、このアプリを開くため
         CFBundleURLTypes:
           - CFBundleURLName: com.takasub5.MyVoice
