@@ -97,9 +97,10 @@ private struct DictionaryTab: View {
         Form {
             Section {
                 HStack {
-                    TextField("誤変換", text: $newWrong)
+                    // フォームの中だと見出しが左・入力が右寄せになるので、見出しを隠して枠付きの欄にする
+                    TextField("誤変換", text: $newWrong, prompt: Text("誤変換(なくてもよい)"))
                     Image(systemName: "arrow.right").foregroundStyle(.secondary)
-                    TextField("正しい表記", text: $newRight)
+                    TextField("正しい表記", text: $newRight, prompt: Text("正しい表記"))
                     Button("追加") {
                         terms.insert(Term(wrong: newWrong.trimmingCharacters(in: .whitespaces),
                                           right: newRight.trimmingCharacters(in: .whitespaces)), at: 0)
@@ -109,6 +110,9 @@ private struct DictionaryTab: View {
                     }
                     .disabled(newRight.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
+                .labelsHidden()
+                .textFieldStyle(.roundedBorder)
+                .multilineTextAlignment(.leading)
                 NavigationLink("AIのメモリから取り込む") { ImportView(terms: $terms).formStyle(.grouped) }
             }
 
