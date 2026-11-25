@@ -22,7 +22,7 @@ xcrun devicectl device install app --device 00008160-000A03A000214036 build/Buil
 
 ## Mac版(`Mac/`)
 - Caps Lockを押している間だけ録音 → 離すと文字起こし・整形 → クリップボード経由で⌘Vを送ってカーソル位置に入れる(0.8秒後に元のクリップボードへ戻す)
-- Caps LockはKarabiner-ElementsでF18(キーコード79)にしてある。F18はCodex(ChatGPT.app、`com.openai.codex`)の音声入力にも使っているので、**Codexが前面のときは反応しない**(設定で切り替え可)
+- Caps LockはKarabiner-ElementsでF18(キーコード79)にしてある。F18は以前Codex(ChatGPT.app、`com.openai.codex`)の音声入力(`globalDictationHold`)に使っていたが、2026-11-25に本人の許可で `~/.codex/keybindings.json` の割り当てを外した(バックアップ `keybindings.json.bak-2026-11-25`)。マイ音声入力はCodexを含むすべてのアプリで動く。「Codexが前面のときは任せる」設定は既定でオフ
 - 右Commandは本人がAキーに割り当てている。ショートカットに使わない
 - 録音は `AVAudioRecorder` で16kHzのWAV。キーの監視は `NSEvent` のグローバルモニタ。マイクとアクセシビリティの許可が要る
 - 署名はプロファイルなしの開発用証明書(`CODE_SIGN_STYLE: Manual`)。サンドボックスなし。辞書・APIキーはこのMacのKeychain(iPhoneとはまだ同期しない)

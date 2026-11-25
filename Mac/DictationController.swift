@@ -17,7 +17,8 @@ final class DictationController: ObservableObject {
 
     /// F18のキーコード(kVK_F18)
     private static let hotKeyCode: UInt16 = 79
-    /// Codex(ChatGPT.app)。前面にあるときはCodex自身の音声入力に任せる
+    /// Codex(ChatGPT.app)。設定をオンにしたときだけ、前面にあるCodexには反応しない
+    /// (2026-11-25、本人の許可でCodex側のF18の割り当ては外した)
     private static let codexBundleID = "com.openai.codex"
     /// これより短い押下は、押し間違いとして捨てる
     private static let minimumSeconds = 0.4
@@ -25,7 +26,7 @@ final class DictationController: ObservableObject {
     @Published private(set) var phase: Phase = .idle
     @Published var modes = ModeStore.load()
     @Published var selectedModeID = ModeStore.selected(in: ModeStore.load()).id
-    @AppStorage("leaveF18ToCodex") var leaveF18ToCodex = true
+    @AppStorage("leaveF18ToCodex") var leaveF18ToCodex = false
 
     private var recorder: AVAudioRecorder?
     private var recordingURL: URL { FileManager.default.temporaryDirectory.appendingPathComponent("myvoice-recording.wav") }
