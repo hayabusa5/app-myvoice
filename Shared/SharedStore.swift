@@ -114,10 +114,18 @@ enum TermStore {
         return words
     }
 
-    static func prompt(for terms: [Term]) -> String {
+    static func prompt(for terms: [Term], language: SpeechLanguage = .japanese) -> String {
         let words = hintWords(terms)
-        guard !words.isEmpty else { return "以下は日本語の音声入力です。句読点を付けて書きます。" }
-        return promptHead + words.joined(separator: "、") + "、"
+        switch language {
+        case .japanese:
+            guard !words.isEmpty else { return "以下は日本語の音声入力です。句読点を付けて書きます。" }
+            return promptHead + words.joined(separator: "、") + "、"
+        case .english:
+            return "This is English dictation with proper punctuation." + (words.isEmpty ? "" : " Terms: " + words.joined(separator: ", ") + ".")
+        case .auto:
+            // 言語を決めつけない。用語だけを並べる
+            return words.joined(separator: ", ")
+        }
     }
 
     /// 誤変換を正しい表記に置き換える。
@@ -205,5 +213,46 @@ enum ModeStore {
 
     static func select(_ mode: FormatMode) {
         SharedKeychain.set(Data(mode.id.uuidString.utf8), selectedKey)
+    }
+}
+
+// MARK: - 認識する言語
+
+enum SpeechLanguage: String, CaseIterable, Identifiable {
+    case auto, japanese, english
+
+    var id: String { rawValue }
+    /// Groqに渡す言語コード。自動のときは渡さない
+    var code: String? {
+        switch self {
+        case .auto: return nil
+        case .japanese: return "ja"
+        case .english: return "en"
+        }
+    }
+    var label: String {
+        switch self {
+        case .auto: return "自動"
+        case .japanese: return "日本語"
+        case .english: return "英語"
+        }
+    }
+    /// キーボードのボタンに出す短い表示
+    var shortLabel: String {
+        switch self {
+        case .auto: return "自動"
+        case .japanese: return "日"
+        case .english: return "EN"
+        }
+    }
+    var next: SpeechLanguage {
+        let all = Self.allCases
+        return all[(all.firstIndex(of: self)! + 1) % all.count]
+    }
+
+    private static let key = "speech-language"
+    static var current: SpeechLanguage {
+        get { SharedKeychain.data(key).flatMap { SpeechLanguage(rawValue: String(decoding: $0, as: UTF8.self)) } ?? .auto }
+        set { SharedKeychain.set(Data(newValue.rawValue.utf8), key) }
     }
 }

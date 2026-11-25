@@ -33,6 +33,14 @@ private struct MenuContent: View {
         Text(statusText)
         Divider()
         Text("Caps Lockを押している間だけ録音")
+        Section("認識する言語") {
+            ForEach(SpeechLanguage.allCases) { language in
+                Toggle(language.label, isOn: Binding(
+                    get: { controller.language == language },
+                    set: { if $0 { controller.language = language } }
+                ))
+            }
+        }
         Section("整形モード") {
             ForEach(controller.modes) { mode in
                 Toggle(mode.name, isOn: Binding(

@@ -26,6 +26,9 @@ final class DictationController: ObservableObject {
     @Published private(set) var phase: Phase = .idle
     @Published var modes = ModeStore.load()
     @Published var selectedModeID = ModeStore.selected(in: ModeStore.load()).id
+    @Published var language = SpeechLanguage.current {
+        didSet { SpeechLanguage.current = language }
+    }
     @AppStorage("leaveF18ToCodex") var leaveF18ToCodex = false
 
     private var recorder: AVAudioRecorder?
@@ -140,11 +143,12 @@ final class DictationController: ObservableObject {
     private func transcribe(wav: Data, seconds: Double) {
         guard let apiKey = APIKeyStore.load() else { return show(GroqError.noAPIKey.errorDescription ?? "") }
         let terms = TermStore.load()
+        let language = SpeechLanguage.current
         let mode = modes.first { $0.id == selectedModeID } ?? modes[0]
         set(.processing("文字にしています…"))
         Task { @MainActor in
             do {
-                let raw = try await GroqClient.transcribe(wav: wav, apiKey: apiKey, prompt: TermStore.prompt(for: terms))
+                let raw = try await GroqClient.transcribe(wav: wav, apiKey: apiKey, prompt: TermStore.prompt(for: terms, language: language), language: language)
                 UsageStore.add(seconds: seconds)
                 let text = TermStore.apply(terms, to: GroqClient.clean(raw))
                 guard !text.isEmpty else { return show("声が聞き取れませんでした") }

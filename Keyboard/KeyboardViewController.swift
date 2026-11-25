@@ -16,6 +16,7 @@ final class KeyboardViewController: UIInputViewController {
     private let micButton = UIButton(type: .system)
     private let retryButton = UIButton(type: .system)
     private let globeButton = UIButton(type: .system)
+    private lazy var languageButton = keyButton(title: SpeechLanguage.current.shortLabel)
     private var deleteTimer: Timer?
 
     override func viewDidLoad() {
@@ -33,6 +34,7 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         reloadModes()
+        languageButton.configuration?.title = SpeechLanguage.current.shortLabel
     }
 
     override func viewWillDisappear(_ animated: Bool) {
@@ -92,12 +94,13 @@ final class KeyboardViewController: UIInputViewController {
         render()
         setStatus("文字にしています…")
         let terms = TermStore.load()
+        let language = SpeechLanguage.current
         let mode = selectedMode
         Task { @MainActor in
             defer { isTranscribing = false; render() }
             do {
                 let raw = try await GroqClient.transcribe(
-                    wav: WAV.make(pcm: audio), apiKey: apiKey, prompt: TermStore.prompt(for: terms)
+                    wav: WAV.make(pcm: audio), apiKey: apiKey, prompt: TermStore.prompt(for: terms, language: language), language: language
                 )
                 UsageStore.add(seconds: seconds)
                 let text = TermStore.apply(terms, to: GroqClient.clean(raw))
@@ -172,6 +175,17 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
+    @objc private func languageTapped() {
+        let language = SpeechLanguage.current.next
+        SpeechLanguage.current = language
+        languageButton.configuration?.title = language.shortLabel
+        switch language {
+        case .auto: setStatus("言語: 自動(日本語と英語を聞き分けます)")
+        case .japanese: setStatus("言語: 日本語")
+        case .english: setStatus("言語: 英語(English)")
+        }
+    }
+
     @objc private func dismissTapped() {
         if capture.isCapturing { capture.stop() }
         dismissKeyboard()
@@ -219,8 +233,12 @@ final class KeyboardViewController: UIInputViewController {
         dismissButton.accessibilityLabel = "キーボードを閉じる"
         dismissButton.addTarget(self, action: #selector(dismissTapped), for: .touchUpInside)
 
+        languageButton.accessibilityLabel = "認識する言語"
+        languageButton.addTarget(self, action: #selector(languageTapped), for: .touchUpInside)
+
         let bottomRow = UIStackView(arrangedSubviews: [
             globeButton,
+            languageButton,
             textKey("、"), textKey("。"), textKey("？"),
             textKey("空白", insert: " "),
             deleteButton,
