@@ -13,6 +13,7 @@ Claude Code・Codexの共通ルール。自分専用の音声入力。iPhone・i
 - 辞書は上の語ほど優先。Groqの `prompt`(224トークン)に入るのは上から180文字分だけで、アプリでは「ヒント」の印を付けて見せる(`TermStore.hintWords`)。並べ替えは「編集」から
 - 辞書の同期: iCloud Driveの `マイ音声入力/dictionary.json` を読み書きする(`SharedUI/DictionarySync.swift`)。Xcodeにアカウントがなく、iCloudの権限が付いたプロファイルを作れないため、ふつうのファイルにした。Macは直接、iPhoneはアプリで一度フォルダを選んでブックマークで覚える。新しいほう(`TermStore.updatedAt`)が勝つ。初回だけ両方の語を合わせる
 - キーボードの歯車は `myvoice://` でアプリを開く(レスポンダチェーンのUIApplicationに開かせる)
+- Mac版はログイン時に自動で起動する(初回起動で `SMAppService.mainApp.register()`、メニューの「Macの起動時に開く」で切り替え)
 - Mac版のマイク: メニューで選んだマイクを、録音のたびにシステムの入力にする(AirPodsをつなぐと入力が勝手に変わるため、`Mac/AudioInput.swift`)。HUDとキーボードにマイク名の札を出し、AirPodsならオレンジ
 - APIキー・用語辞書・今月の使用量は**共有Keychain**(`$(AppIdentifierPrefix)com.takasub5.MyVoice.shared`)に置く。App Groupは使っていない(下記)
 

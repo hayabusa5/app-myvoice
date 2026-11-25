@@ -1,3 +1,4 @@
+import ServiceManagement
 import SwiftUI
 
 @main
@@ -21,6 +22,11 @@ struct MyVoiceMacApp: App {
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 初めて起動したときに、ログイン時に自動で起動するよう登録する(メニューで外せる)
+        if !UserDefaults.standard.bool(forKey: "login-item-asked") {
+            UserDefaults.standard.set(true, forKey: "login-item-asked")
+            try? SMAppService.mainApp.register()
+        }
         Task { @MainActor in DictationController.shared.start() }
     }
 }
@@ -63,6 +69,12 @@ private struct MenuContent: View {
             }
         }
         Divider()
+        Toggle("Macの起動時に開く", isOn: Binding(
+            get: { SMAppService.mainApp.status == .enabled },
+            set: { on in
+                if on { try? SMAppService.mainApp.register() } else { try? SMAppService.mainApp.unregister() }
+            }
+        ))
         Button("設定…") {
             NSApp.activate(ignoringOtherApps: true)
             openWindow(id: "settings")
