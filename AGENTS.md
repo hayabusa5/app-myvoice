@@ -32,3 +32,8 @@ xcrun devicectl device install app --device 00008160-000A03A000214036 build/Buil
 ## アイコン
 - iPhoneに入れるときは、試作でも簡単なアイコンを付ける(本人の指定)
 - `App/Assets.xcassets/AppIcon.appiconset/icon-1024.png`(1024×1024、アルファなし)。変えるときは差し替えるだけでよい
+
+## GitHub
+- 非公開リポジトリ: https://github.com/hayabusa5/app-myvoice (topic: app)。自動同期はないので、変えたら手動でcommit・pushする
+- コミットの作成者は既存リポジトリと同じ `Claude <noreply@anthropic.com>`(`git -c user.name=Claude -c user.email=noreply@anthropic.com commit`)
+- `MyVoice.xcodeproj` と `build/` は入れない(`xcodegen generate` で作り直せる)。APIキーはコードに書かない
