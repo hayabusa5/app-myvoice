@@ -7,7 +7,7 @@ final class HUDPanel {
     private let model = HUDModel()
     private lazy var panel: NSPanel = {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 340, height: 84),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered, defer: true
         )
@@ -81,6 +81,31 @@ private struct HUDView: View {
     @ObservedObject var model: HUDModel
 
     var body: some View {
+        // 上の吹き出し: 録音中のマイク名。下の吹き出し: 状態・波形・秒数
+        VStack(spacing: 6) {
+            Spacer(minLength: 0)
+            if model.startedAt != nil, let micName = model.micName {
+                micBubble(micName)
+            }
+            mainBubble.frame(height: 44)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func micBubble(_ name: String) -> some View {
+        // AirPodsで録っているときは、音質が落ちるのでオレンジで目立たせる
+        let isAirPods = name.localizedCaseInsensitiveContains("airpods")
+        return Label(name, systemImage: isAirPods ? "airpods" : "mic.fill")
+            .font(.system(size: 13, weight: .bold))
+            .foregroundStyle(isAirPods ? Color.black : Color.white)
+            .lineLimit(1)
+            .truncationMode(.middle)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(isAirPods ? Color.orange : Color.black.opacity(0.78), in: Capsule())
+    }
+
+    private var mainBubble: some View {
         HStack(spacing: 8) {
             Circle().fill(model.color).frame(width: 10, height: 10)
             if let startedAt = model.startedAt {
@@ -90,18 +115,6 @@ private struct HUDView: View {
                         .monospacedDigit()
                 }
                 .frame(width: 52, alignment: .trailing)
-                if let micName = model.micName {
-                    // AirPodsで録っているときは、音質が落ちるのでオレンジで目立たせる
-                    let isAirPods = micName.localizedCaseInsensitiveContains("airpods")
-                    Label(micName, systemImage: isAirPods ? "airpods" : "mic.fill")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(isAirPods ? Color.black : Color.white)
-                        .lineLimit(1)
-                        .truncationMode(.middle)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(isAirPods ? Color.orange : Color.white.opacity(0.22), in: Capsule())
-                }
             } else {
                 Text(model.text).lineLimit(1).minimumScaleFactor(0.7)
             }

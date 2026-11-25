@@ -23,7 +23,7 @@ xcodegen generate
 xcodebuild -project MyVoice.xcodeproj -scheme MyVoice -destination 'id=00008160-000A03A000214036' -derivedDataPath build -allowProvisioningUpdates build
 xcrun devicectl device install app --device 00008160-000A03A000214036 build/Build/Products/Debug-iphoneos/MyVoice.app
 ```
-- 署名のチームは BLLFXPJGG7。コマンドからは「No Accounts」になる(2026-11-25時点でXcodeの設定にAppleアカウントが1つも登録されていない。`defaults read com.apple.dt.Xcode DVTDeveloperAccountManagerAppleIDLists` が空)ため、ワイルドカードのプロファイルで足りる権限だけにしている。App GroupやCloudKitを足すときは、Xcodeで一度ビルドしてプロファイルを作る
+- 署名のチームは BLLFXPJGG7。2026-11-25の夜に本人がXcodeへサインインし、コマンドからも新しい権限(iCloudなど)のプロファイルを作れるようになった(それまでは「No Accounts」)ため、ワイルドカードのプロファイルで足りる権限だけにしている。App GroupやCloudKitを足すときは、Xcodeで一度ビルドしてプロファイルを作る
 - TestFlightは、アーカイブを `open` して Organizer から上げる(`-exportArchive` は失敗する)
 
 ## Mac版(`Mac/`)
