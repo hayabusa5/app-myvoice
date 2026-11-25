@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// ClaudeやChatGPTのメモリから書き出した用語を、コピー&貼り付けで辞書に取り込む。
+/// (iPhone・Mac共通) ClaudeやChatGPTのメモリから書き出した用語を、コピー&貼り付けで辞書に取り込む。
 struct ImportView: View {
     @Binding var terms: [Term]
     @Environment(\.dismiss) private var dismiss
@@ -16,13 +16,13 @@ struct ImportView: View {
         Form {
             Section {
                 Button {
-                    UIPasteboard.general.string = TermImport.prompt
+                    Clipboard.copy(TermImport.prompt)
                     copied = true
                 } label: {
                     Label(copied ? "コピーしました" : "AIに頼む文をコピー", systemImage: copied ? "checkmark" : "doc.on.doc")
                 }
                 Button {
-                    UIPasteboard.general.string = TermImport.latestPrompt
+                    Clipboard.copy(TermImport.latestPrompt)
                     copiedLatest = true
                 } label: {
                     Label(copiedLatest ? "コピーしました" : "新しいAIツール名を頼む文をコピー", systemImage: copiedLatest ? "checkmark" : "magnifyingglass")
@@ -39,7 +39,7 @@ struct ImportView: View {
 
             Section {
                 Button {
-                    pasted = UIPasteboard.general.string ?? ""
+                    pasted = Clipboard.read()
                     readPasted()
                 } label: {
                     Label("AIの返事を貼り付けて読み込む", systemImage: "doc.on.clipboard")
@@ -80,8 +80,10 @@ struct ImportView: View {
             }
         }
         .navigationTitle("辞書をインポート")
+        #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         .scrollDismissesKeyboard(.immediately)
+        #endif
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("\(selectedCount)件を追加") {
@@ -97,5 +99,25 @@ struct ImportView: View {
     private func readPasted() {
         candidates = TermImport.newTerms(TermImport.parse(pasted), existing: terms)
         excluded = []
+    }
+}
+
+/// クリップボードの読み書き(iPhone・Mac共通)
+enum Clipboard {
+    static func copy(_ text: String) {
+        #if os(iOS)
+        UIPasteboard.general.string = text
+        #else
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        #endif
+    }
+
+    static func read() -> String {
+        #if os(iOS)
+        return UIPasteboard.general.string ?? ""
+        #else
+        return NSPasteboard.general.string(forType: .string) ?? ""
+        #endif
     }
 }

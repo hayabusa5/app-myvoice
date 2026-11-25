@@ -15,12 +15,16 @@ enum SharedKeychain {
     private static let service = "com.takasub5.MyVoice.shared"
 
     private static func query(_ account: String) -> [String: Any] {
-        [
+        var query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
-            kSecAttrAccessGroup as String: AppConfig.keychainGroup,
         ]
+        #if os(iOS)
+        // 本体アプリとキーボードで共有する。Mac版はアプリ1つなので共有グループは使わない
+        query[kSecAttrAccessGroup as String] = AppConfig.keychainGroup
+        #endif
+        return query
     }
 
     static func data(_ account: String) -> Data? {

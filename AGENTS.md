@@ -1,6 +1,6 @@
 # マイ音声入力(MyVoice) 作業ルール
 
-Claude Code・Codexの共通ルール。自分専用のiPhone・iPad向け音声入力キーボード。
+Claude Code・Codexの共通ルール。自分専用の音声入力。iPhone・iPad向けのキーボード(`App/` `Keyboard/`)と、Mac向けのメニューバーアプリ(`Mac/`)がある。共通の処理は `Shared/`、共通の画面は `SharedUI/`。
 
 ## 仕組み
 - キーボードの中で録音する。アプリの切り替えはしない。見えない WKWebView の `getUserMedia` でマイクを使う(`Keyboard/WebAudioCapture.swift`、stephancill/ios-keyboard-dictation より、MIT)
@@ -19,6 +19,18 @@ xcrun devicectl device install app --device 00008160-000A03A000214036 build/Buil
 ```
 - 署名のチームは BLLFXPJGG7。コマンドからはXcodeのアカウントを使えない(「No Accounts」)ため、ワイルドカードのプロファイルで足りる権限だけにしている。App GroupやCloudKitを足すときは、Xcodeで一度ビルドしてプロファイルを作る
 - TestFlightは、アーカイブを `open` して Organizer から上げる(`-exportArchive` は失敗する)
+
+## Mac版(`Mac/`)
+- Caps Lockを押している間だけ録音 → 離すと文字起こし・整形 → クリップボード経由で⌘Vを送ってカーソル位置に入れる(0.8秒後に元のクリップボードへ戻す)
+- Caps LockはKarabiner-ElementsでF18(キーコード79)にしてある。F18はCodex(ChatGPT.app、`com.openai.codex`)の音声入力にも使っているので、**Codexが前面のときは反応しない**(設定で切り替え可)
+- 右Commandは本人がAキーに割り当てている。ショートカットに使わない
+- 録音は `AVAudioRecorder` で16kHzのWAV。キーの監視は `NSEvent` のグローバルモニタ。マイクとアクセシビリティの許可が要る
+- 署名はプロファイルなしの開発用証明書(`CODE_SIGN_STYLE: Manual`)。サンドボックスなし。辞書・APIキーはこのMacのKeychain(iPhoneとはまだ同期しない)
+- 入れ方:
+```bash
+xcodebuild -project MyVoice.xcodeproj -scheme MyVoiceMac -destination 'platform=macOS' -derivedDataPath build build
+ditto "build/Build/Products/Debug/マイ音声入力.app" "/Applications/マイ音声入力.app"
+```
 
 ## 使う前の設定(iPhone側)
 1. アプリを開いてマイクを許可し、Groq APIキーを保存する

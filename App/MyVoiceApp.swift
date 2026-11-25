@@ -249,27 +249,3 @@ struct ContentView: View {
         }
     }
 }
-
-struct ModeEditor: View {
-    @Binding var mode: FormatMode
-    var onSave: () -> Void
-
-    var body: some View {
-        Form {
-            Section("名前") {
-                TextField("名前", text: $mode.name)
-            }
-            Section {
-                TextField("AIへの指示", text: $mode.instruction, axis: .vertical)
-                    .lineLimit(4...12)
-            } header: {
-                Text("AIへの指示")
-            } footer: {
-                Text("空にすると、整形せずにそのまま入れます。")
-            }
-        }
-        .navigationTitle(mode.name)
-        .scrollDismissesKeyboard(.immediately)
-        .onDisappear(perform: onSave)
-    }
-}
