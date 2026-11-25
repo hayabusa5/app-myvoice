@@ -12,7 +12,9 @@ final class KeyboardViewController: UIInputViewController {
     private var selectedMode: FormatMode = ModeStore.selected(in: ModeStore.load())
     private let modeRow = UIStackView()
 
-    private let statusLabel = UILabel()
+    /// 状態の知らせ(録音中・エラーなど)。案内用の1行は置かず、「話す」ボタンの下の小さな字に出す
+    private var statusText: String?
+    private var statusClearTask: Task<Void, Never>?
     private let micButton = UIButton(type: .system)
     private let retryButton = UIButton(type: .system)
     private let micSourceButton = UIButton(type: .system)
@@ -229,20 +231,20 @@ final class KeyboardViewController: UIInputViewController {
     // MARK: - 画面
 
     private func configureView() {
-        let height = view.heightAnchor.constraint(equalToConstant: 232)
+        let height = view.heightAnchor.constraint(equalToConstant: 208)
         height.priority = .defaultHigh
         height.isActive = true
-
-        statusLabel.font = .preferredFont(forTextStyle: .footnote)
-        statusLabel.textColor = .secondaryLabel
-        statusLabel.textAlignment = .center
-        statusLabel.numberOfLines = 1
-        statusLabel.adjustsFontSizeToFitWidth = true
 
         var micConfig = UIButton.Configuration.filled()
         micConfig.cornerStyle = .capsule
         micConfig.image = UIImage(systemName: "mic.fill")
         micConfig.imagePadding = 8
+        micConfig.titleAlignment = .center
+        micConfig.subtitleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attrs in
+            var attrs = attrs
+            attrs.font = .preferredFont(forTextStyle: .caption2)
+            return attrs
+        }
         micButton.configuration = micConfig
         micButton.addTarget(self, action: #selector(micTapped), for: .touchUpInside)
 
@@ -307,7 +309,7 @@ final class KeyboardViewController: UIInputViewController {
             modeScroll.heightAnchor.constraint(equalToConstant: 36),
         ])
 
-        let stack = UIStackView(arrangedSubviews: [statusLabel, modeScroll, micRow, bottomRow])
+        let stack = UIStackView(arrangedSubviews: [modeScroll, micRow, bottomRow])
         stack.axis = .vertical
         stack.spacing = 8
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -366,13 +368,22 @@ final class KeyboardViewController: UIInputViewController {
             config.image = UIImage(systemName: "mic.fill")
             config.baseBackgroundColor = capture.isReady ? .systemBlue : .systemGray
             micButton.isEnabled = capture.isReady
-            if statusLabel.text == nil { setStatus("「話す」を押して話してください。アプリは切り替わりません") }
         }
+        config.subtitle = statusText
         micButton.configuration = config
     }
 
     private func setStatus(_ text: String) {
-        statusLabel.text = text
+        statusText = text.isEmpty ? nil : text
+        render()
+        // 録音中・処理中でなければ、少したったら消す
+        statusClearTask?.cancel()
+        statusClearTask = Task { @MainActor [weak self] in
+            try? await Task.sleep(for: .seconds(4))
+            guard let self, !Task.isCancelled, !self.capture.isCapturing, !self.isTranscribing else { return }
+            self.statusText = nil
+            self.render()
+        }
     }
 }
 
