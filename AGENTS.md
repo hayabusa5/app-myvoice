@@ -11,6 +11,9 @@ Claude Code・Codexの共通ルール。自分専用の音声入力。iPhone・i
 - 認識する言語は「自動/日本語/英語」(`SpeechLanguage`、既定は自動)。自動のときはGroqに `language` を渡さず、`prompt` も用語だけにする(日本語の文を入れると英語の発話もカタカナになりやすい)。iPhoneはキーボードの下の段のボタン、Macはメニューで切り替える。整形モードは、翻訳のモード以外では元の言語のまま整える
 - マイクの選び方(iPhone): キーボードのマイクボタンの左で「自動/本体」を切り替える(`MicPreference`)。本体のときは、WebKitの `enumerateDevices` から名前に iPhone などを含むマイクを選んで録音し直す。選べなければ、つないでいるマイクのまま録音する。外を歩くとき用(本人)。キーボードの中で切り替えが効くかは実機で要確認
 - 辞書は上の語ほど優先。Groqの `prompt`(224トークン)に入るのは上から180文字分だけで、アプリでは「ヒント」の印を付けて見せる(`TermStore.hintWords`)。並べ替えは「編集」から
+- 辞書の同期: iCloud Driveの `マイ音声入力/dictionary.json` を読み書きする(`SharedUI/DictionarySync.swift`)。Xcodeにアカウントがなく、iCloudの権限が付いたプロファイルを作れないため、ふつうのファイルにした。Macは直接、iPhoneはアプリで一度フォルダを選んでブックマークで覚える。新しいほう(`TermStore.updatedAt`)が勝つ。初回だけ両方の語を合わせる
+- キーボードの歯車は `myvoice://` でアプリを開く(レスポンダチェーンのUIApplicationに開かせる)
+- Mac版のマイク: メニューで選んだマイクを、録音のたびにシステムの入力にする(AirPodsをつなぐと入力が勝手に変わるため、`Mac/AudioInput.swift`)。HUDとキーボードにマイク名の札を出し、AirPodsならオレンジ
 - APIキー・用語辞書・今月の使用量は**共有Keychain**(`$(AppIdentifierPrefix)com.takasub5.MyVoice.shared`)に置く。App Groupは使っていない(下記)
 
 ## ビルドとインストール
@@ -19,7 +22,7 @@ xcodegen generate
 xcodebuild -project MyVoice.xcodeproj -scheme MyVoice -destination 'id=00008160-000A03A000214036' -derivedDataPath build -allowProvisioningUpdates build
 xcrun devicectl device install app --device 00008160-000A03A000214036 build/Build/Products/Debug-iphoneos/MyVoice.app
 ```
-- 署名のチームは BLLFXPJGG7。コマンドからはXcodeのアカウントを使えない(「No Accounts」)ため、ワイルドカードのプロファイルで足りる権限だけにしている。App GroupやCloudKitを足すときは、Xcodeで一度ビルドしてプロファイルを作る
+- 署名のチームは BLLFXPJGG7。コマンドからは「No Accounts」になる(2026-11-25時点でXcodeの設定にAppleアカウントが1つも登録されていない。`defaults read com.apple.dt.Xcode DVTDeveloperAccountManagerAppleIDLists` が空)ため、ワイルドカードのプロファイルで足りる権限だけにしている。App GroupやCloudKitを足すときは、Xcodeで一度ビルドしてプロファイルを作る
 - TestFlightは、アーカイブを `open` して Organizer から上げる(`-exportArchive` は失敗する)
 
 ## Mac版(`Mac/`)

@@ -20,6 +20,8 @@ final class KeyboardViewController: UIInputViewController {
     private let recordingOverlay = UIStackView()
     private let waveform = WaveformView()
     private let timeLabel = UILabel()
+    /// 録音に使っているマイクの名前(目立つように白い札にする。AirPodsならオレンジ)
+    private let micBadge = PaddedLabel()
     private var deviceLabel: String?
     private let retryButton = UIButton(type: .system)
     private let micSourceButton = UIButton(type: .system)
@@ -41,7 +43,7 @@ final class KeyboardViewController: UIInputViewController {
         capture.onDevice = { [weak self] label in
             guard let self, !label.isEmpty else { return }
             self.deviceLabel = label
-            self.updateTimeLabel(seconds: 0)
+            self.updateMicBadge()
         }
         capture.attach(to: view)
         render()
@@ -81,6 +83,7 @@ final class KeyboardViewController: UIInputViewController {
         pcm = Data()
         failedPCM = nil
         deviceLabel = nil
+        updateMicBadge()
         waveform.reset()
         updateTimeLabel(seconds: 0)
         capture.start(preferBuiltInMic: MicPreference.preferBuiltIn)
@@ -96,8 +99,16 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func updateTimeLabel(seconds: Double) {
-        let time = String(format: "%.1f秒", seconds)
-        timeLabel.text = deviceLabel.map { "\($0)  \(time)" } ?? time
+        timeLabel.text = String(format: "%.1f秒", seconds)
+    }
+
+    private func updateMicBadge() {
+        guard let name = deviceLabel, !name.isEmpty else { micBadge.isHidden = true; return }
+        let isAirPods = name.localizedCaseInsensitiveContains("airpods")
+        micBadge.isHidden = false
+        micBadge.text = (isAirPods ? "🎧 " : "🎙 ") + name
+        micBadge.textColor = isAirPods ? .black : .systemRed
+        micBadge.backgroundColor = isAirPods ? .systemOrange : .white
     }
 
     private func captureEnded(_ reason: String) {
@@ -276,7 +287,14 @@ final class KeyboardViewController: UIInputViewController {
         timeLabel.setContentHuggingPriority(.required, for: .horizontal)
         timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
         waveform.setContentHuggingPriority(.defaultLow, for: .horizontal)
-        [stopIcon, waveform, timeLabel].forEach(recordingOverlay.addArrangedSubview)
+        micBadge.font = .systemFont(ofSize: 13, weight: .bold)
+        micBadge.layer.cornerRadius = 10
+        micBadge.layer.masksToBounds = true
+        micBadge.lineBreakMode = .byTruncatingMiddle
+        micBadge.isHidden = true
+        micBadge.setContentHuggingPriority(.required, for: .horizontal)
+        micBadge.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
+        [stopIcon, micBadge, waveform, timeLabel].forEach(recordingOverlay.addArrangedSubview)
         recordingOverlay.spacing = 10
         recordingOverlay.alignment = .center
         recordingOverlay.isUserInteractionEnabled = false
@@ -352,7 +370,15 @@ final class KeyboardViewController: UIInputViewController {
             modeScroll.heightAnchor.constraint(equalToConstant: 36),
         ])
 
-        let stack = UIStackView(arrangedSubviews: [modeScroll, micRow, bottomRow])
+        // 歯車: マイ音声入力アプリ(辞書・モード・APIキーの設定)を開く
+        let settingsButton = keyButton(image: "gearshape")
+        settingsButton.accessibilityLabel = "マイ音声入力の設定を開く"
+        settingsButton.addTarget(self, action: #selector(openSettingsTapped), for: .touchUpInside)
+        settingsButton.widthAnchor.constraint(equalToConstant: 40).isActive = true
+        let topRow = UIStackView(arrangedSubviews: [settingsButton, modeScroll])
+        topRow.spacing = 6
+
+        let stack = UIStackView(arrangedSubviews: [topRow, micRow, bottomRow])
         stack.axis = .vertical
         stack.spacing = 8
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -369,6 +395,20 @@ final class KeyboardViewController: UIInputViewController {
             bottomRow.heightAnchor.constraint(equalToConstant: 46),
             globeButton.widthAnchor.constraint(equalToConstant: 40),
         ])
+    }
+
+    /// キーボードから直接はURLを開けないので、レスポンダチェーンをたどってUIApplicationに開かせる
+    @objc private func openSettingsTapped() {
+        guard let url = URL(string: "myvoice://settings") else { return }
+        var responder: UIResponder? = self
+        while let current = responder {
+            if let application = current as? UIApplication {
+                application.open(url, options: [:], completionHandler: nil)
+                return
+            }
+            responder = current.next
+        }
+        setStatus("アプリを開けませんでした。ホーム画面から開いてください")
     }
 
     private func textKey(_ title: String, insert: String? = nil) -> UIButton {
@@ -430,6 +470,16 @@ final class KeyboardViewController: UIInputViewController {
             self.statusText = nil
             self.render()
         }
+    }
+}
+
+/// 内側に余白のあるラベル(マイク名の札)
+final class PaddedLabel: UILabel {
+    private let insets = UIEdgeInsets(top: 3, left: 8, bottom: 3, right: 8)
+    override func drawText(in rect: CGRect) { super.drawText(in: rect.inset(by: insets)) }
+    override var intrinsicContentSize: CGSize {
+        let size = super.intrinsicContentSize
+        return CGSize(width: size.width + insets.left + insets.right, height: size.height + insets.top + insets.bottom)
     }
 }
 

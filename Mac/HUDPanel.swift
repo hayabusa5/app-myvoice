@@ -7,7 +7,7 @@ final class HUDPanel {
     private let model = HUDModel()
     private lazy var panel: NSPanel = {
         let panel = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 360, height: 44),
+            contentRect: NSRect(x: 0, y: 0, width: 460, height: 44),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered, defer: true
         )
@@ -23,6 +23,12 @@ final class HUDPanel {
     }()
 
     func resetLevels() { model.levels = [] }
+
+    /// 録音に使うマイクの名前(HUDに出す)
+    var micName: String? {
+        get { model.micName }
+        set { model.micName = newValue }
+    }
 
     /// 録音の音量(dB、-160〜0)を波形に足す
     func push(decibels: Float) {
@@ -67,6 +73,7 @@ final class HUDModel: ObservableObject {
     @Published var startedAt: Date?
     @Published var color: Color = .red
     @Published var levels: [CGFloat] = []
+    @Published var micName: String?
     static let maxBars = 36
 }
 
@@ -83,6 +90,18 @@ private struct HUDView: View {
                         .monospacedDigit()
                 }
                 .frame(width: 52, alignment: .trailing)
+                if let micName = model.micName {
+                    // AirPodsで録っているときは、音質が落ちるのでオレンジで目立たせる
+                    let isAirPods = micName.localizedCaseInsensitiveContains("airpods")
+                    Label(micName, systemImage: isAirPods ? "airpods" : "mic.fill")
+                        .font(.system(size: 13, weight: .bold))
+                        .foregroundStyle(isAirPods ? Color.black : Color.white)
+                        .lineLimit(1)
+                        .truncationMode(.middle)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 4)
+                        .background(isAirPods ? Color.orange : Color.white.opacity(0.22), in: Capsule())
+                }
             } else {
                 Text(model.text).lineLimit(1).minimumScaleFactor(0.7)
             }

@@ -33,6 +33,19 @@ private struct MenuContent: View {
         Text(statusText)
         Divider()
         Text("Caps Lockを押している間だけ録音")
+        Section("マイク(今: \(controller.currentInput?.name ?? "不明"))") {
+            Toggle("システムの入力に従う", isOn: Binding(
+                get: { controller.preferredInputUID == nil },
+                set: { if $0 { controller.preferredInputUID = nil } }
+            ))
+            ForEach(controller.inputDevices) { device in
+                Toggle(device.name, isOn: Binding(
+                    get: { controller.preferredInputUID == device.uid },
+                    set: { if $0 { controller.preferredInputUID = device.uid } }
+                ))
+            }
+        }
+        .onAppear { controller.refreshInputs() }
         Section("認識する言語") {
             ForEach(SpeechLanguage.allCases) { language in
                 Toggle(language.label, isOn: Binding(

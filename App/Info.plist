@@ -20,6 +20,17 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>1.0</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>com.takasub5.MyVoice</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>myvoice</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>NSMicrophoneUsageDescription</key>

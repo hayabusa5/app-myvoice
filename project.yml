@@ -29,6 +29,10 @@ targets:
         NSMicrophoneUsageDescription: キーボードで話した声を文字にするために使います。
         UILaunchScreen: {}
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        # キーボードの歯車ボタンから、このアプリを開くため
+        CFBundleURLTypes:
+          - CFBundleURLName: com.takasub5.MyVoice
+            CFBundleURLSchemes: [myvoice]
     entitlements:
       path: App/MyVoice.entitlements
       properties:

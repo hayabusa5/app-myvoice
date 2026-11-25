@@ -30,6 +30,16 @@ final class DictationController: ObservableObject {
         didSet { SpeechLanguage.current = language }
     }
     @AppStorage("leaveF18ToCodex") var leaveF18ToCodex = false
+    /// 入力装置の一覧と、選んだマイク(nilならシステムの入力のまま)
+    @Published private(set) var inputDevices: [AudioInputDevice] = AudioInput.devices()
+    @Published private(set) var currentInput: AudioInputDevice? = AudioInput.current
+    @Published var preferredInputUID: String? = AudioInput.preferredUID {
+        didSet {
+            AudioInput.preferredUID = preferredInputUID
+            _ = AudioInput.applyPreferred()
+            refreshInputs()
+        }
+    }
 
     private var recorder: AVAudioRecorder?
     private var recordingURL: URL { FileManager.default.temporaryDirectory.appendingPathComponent("myvoice-recording.wav") }
@@ -49,8 +59,15 @@ final class DictationController: ObservableObject {
 
     // MARK: - 起動時
 
+    private var syncTimer: Timer?
+
     func start() {
         requestPermissions()
+        // 辞書をiCloud Drive経由でiPhoneと同期する(起動時と30秒ごと)
+        DictionarySync.shared.sync()
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+            Task { @MainActor in DictionarySync.shared.sync() }
+        }
         let handler: (NSEvent) -> Void = { [weak self] event in
             guard event.keyCode == Self.hotKeyCode else { return }
             Task { @MainActor in self?.handleKey(down: event.type == .keyDown, isRepeat: event.isARepeat) }
@@ -74,6 +91,11 @@ final class DictationController: ObservableObject {
 
     var hasAccessibility: Bool { AXIsProcessTrusted() }
     var hasMicrophone: Bool { AVCaptureDevice.authorizationStatus(for: .audio) == .authorized }
+
+    func refreshInputs() {
+        inputDevices = AudioInput.devices()
+        currentInput = AudioInput.current
+    }
 
     func reloadSettings() {
         modes = ModeStore.load()
@@ -116,6 +138,10 @@ final class DictationController: ObservableObject {
             AVLinearPCMIsFloatKey: false,
             AVLinearPCMIsBigEndianKey: false,
         ]
+        // 選んだマイクに戻してから録る(AirPodsをつなぐと入力が勝手に変わるため)
+        let mic = AudioInput.applyPreferred()
+        refreshInputs()
+        hud.micName = mic?.name
         do {
             try? FileManager.default.removeItem(at: recordingURL)
             let recorder = try AVAudioRecorder(url: recordingURL, settings: settings)

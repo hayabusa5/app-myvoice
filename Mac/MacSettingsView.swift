@@ -88,6 +88,7 @@ private struct GeneralTab: View {
 
 private struct DictionaryTab: View {
     @State private var terms = TermStore.load()
+    @ObservedObject private var sync = DictionarySync.shared
     @State private var newWrong = ""
     @State private var newRight = ""
 
@@ -109,6 +110,17 @@ private struct DictionaryTab: View {
                     .disabled(newRight.trimmingCharacters(in: .whitespaces).isEmpty)
                 }
                 NavigationLink("AIのメモリから取り込む") { ImportView(terms: $terms).formStyle(.grouped) }
+            }
+
+            Section {
+                HStack {
+                    Label(syncText, systemImage: sync.lastError == nil ? "icloud" : "exclamationmark.icloud")
+                        .foregroundStyle(sync.lastError == nil ? Color.primary : Color.orange)
+                    Spacer()
+                    Button("今すぐ同期") { sync.sync() }
+                }
+            } footer: {
+                Text("iCloud Driveの「\(DictionarySync.folderName)」フォルダを通して、iPhoneと辞書を同期します。最後に変えたほうの辞書が残ります。iPhoneでは、アプリの「用語辞書」でこのフォルダを一度選んでください。")
             }
 
             Section {
@@ -140,11 +152,22 @@ private struct DictionaryTab: View {
             } header: {
                 Text("登録済み(\(terms.count)語)")
             } footer: {
-                Text("【上にある語ほど優先されます】Groqの仕様で、認識のヒントとして送れる文字数には上限があります(224トークン)。送れるのは上から「ヒント」の印が付いた語までです。行をドラッグして並べ替えられます。置き換えと整形モードは、すべての語に効きます。このMacの辞書は、iPhoneの辞書とはまだ同期しません。")
+                Text("【上にある語ほど優先されます】Groqの仕様で、認識のヒントとして送れる文字数には上限があります(224トークン)。送れるのは上から「ヒント」の印が付いた語までです。行をドラッグして並べ替えられます。置き換えと整形モードは、すべての語に効きます。")
             }
         }
         .formStyle(.grouped)
         .navigationTitle("用語辞書")
+        .onAppear { sync.sync(); terms = TermStore.load() }
+        .onChange(of: sync.revision) { _, _ in terms = TermStore.load() }
+    }
+}
+
+private extension DictionaryTab {
+    var syncText: String {
+        if let error = sync.lastError { return error }
+        if !sync.isConfigured { return "iCloud Driveがオフです" }
+        guard let date = sync.lastSynced else { return "まだ同期していません" }
+        return "同期しました(\(date.formatted(date: .omitted, time: .shortened)))"
     }
 }
 

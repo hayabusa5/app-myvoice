@@ -94,8 +94,24 @@ enum TermStore {
         return terms
     }
 
+    /// この端末で辞書を変えたときに流す(同期がiCloud Driveへ書き出す)
+    static let didChange = Notification.Name("TermStore.didChange")
+
     static func save(_ terms: [Term]) {
+        save(terms, updatedAt: Date())
+        NotificationCenter.default.post(name: didChange, object: nil)
+    }
+
+    /// 同期で受け取った辞書は、相手の更新時刻のまま保存する
+    static func save(_ terms: [Term], updatedAt: Date) {
         SharedKeychain.set(try? JSONEncoder().encode(terms), key)
+        SharedKeychain.set(withUnsafeBytes(of: updatedAt.timeIntervalSince1970) { Data($0) }, "terms-updated")
+    }
+
+    /// この端末の辞書を最後に変えた時刻(同期で新しいほうを残すために使う)
+    static var updatedAt: Date {
+        guard let data = SharedKeychain.data("terms-updated"), data.count == 8 else { return .distantPast }
+        return Date(timeIntervalSince1970: data.withUnsafeBytes { $0.load(as: Double.self) })
     }
 
     /// Groqの `prompt` は224トークンまでなので、辞書の上から入るだけ入れる。
