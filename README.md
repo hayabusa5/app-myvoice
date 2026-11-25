@@ -23,6 +23,7 @@
 
 - **用語辞書**: 上にある語ほど優先して、認識のヒントとしてGroqに送ります(Groqの `prompt` は224トークンまで)。実際に出た誤変換を登録すると、自動で置き換えます
 - **AIのメモリから取り込む**: 依頼文をClaudeやChatGPTに貼ると、普段使っている固有名詞を辞書の形で返してくれます。その返事を貼ると、まとめて取り込めます
+- **Claude Codeから辞書を育てる**: Mac版は `myvoice-mac://add-term?wrong=誤変換&right=正しい表記` を受け取ると、辞書の一番上に足します(iPhoneにも同期)。[claude-skills/myvoice-dictionary](claude-skills/myvoice-dictionary/SKILL.md) を `~/.claude/skills/` に置くと、Claude Codeに「〇〇は△△って書いて」と頼むだけで登録されます
 - **整形に失敗しても、話した言葉は失いません**。そのときは文字起こしをそのまま入れます
 
 ## 仕組み

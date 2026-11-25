@@ -92,6 +92,10 @@ targets:
       properties:
         CFBundleDisplayName: マイ音声入力
         LSUIElement: true
+        # Claude Codeなどから辞書に語を足す: open "myvoice-mac://add-term?wrong=…&right=…"
+        CFBundleURLTypes:
+          - CFBundleURLName: com.takasub5.MyVoice.mac
+            CFBundleURLSchemes: [myvoice-mac]
         NSMicrophoneUsageDescription: Caps Lockを押している間に話した声を文字にするために使います。
     settings:
       base:

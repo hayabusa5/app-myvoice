@@ -97,6 +97,26 @@ final class DictationController: ObservableObject {
         currentInput = AudioInput.current
     }
 
+    /// 外から辞書に語を足す(Claude Codeのスキルが `open "myvoice-mac://add-term?..."` で呼ぶ)
+    func handle(_ url: URL) {
+        guard url.scheme == "myvoice-mac", url.host == "add-term",
+              let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems else { return }
+        var added: [Term] = []
+        var wrong = ""
+        for item in items {
+            switch item.name {
+            case "wrong": wrong = item.value ?? ""
+            case "right":
+                if let term = TermStore.upsert(wrong: wrong, right: item.value ?? "") { added.append(term) }
+                wrong = ""
+            default: break
+            }
+        }
+        guard !added.isEmpty else { return show("辞書に足せませんでした(正しい表記が空です)") }
+        let text = added.map { $0.wrong.isEmpty ? $0.right : "\($0.wrong)→\($0.right)" }.joined(separator: "、")
+        show("辞書に追加: \(text)")
+    }
+
     func reloadSettings() {
         modes = ModeStore.load()
         selectedModeID = ModeStore.selected(in: modes).id

@@ -163,6 +163,8 @@ private struct DictionaryTab: View {
         .navigationTitle("用語辞書")
         .onAppear { sync.sync(); terms = TermStore.load() }
         .onChange(of: sync.revision) { _, _ in terms = TermStore.load() }
+        // Claude Codeなど外から足されたときも読み直す
+        .onReceive(NotificationCenter.default.publisher(for: TermStore.didChange)) { _ in terms = TermStore.load() }
     }
 }
 

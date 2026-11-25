@@ -13,6 +13,7 @@ Claude Code・Codexの共通ルール。自分専用の音声入力。iPhone・i
 - 辞書は上の語ほど優先。Groqの `prompt`(224トークン)に入るのは上から180文字分だけで、アプリでは「ヒント」の印を付けて見せる(`TermStore.hintWords`)。並べ替えは「編集」から
 - 辞書の同期: iCloudのキー値ストア(`NSUbiquitousKeyValueStore`、`SharedUI/DictionarySync.swift`)。iPhoneアプリとMac版に同じ `com.apple.developer.ubiquity-kvstore-identifier`(`$(TeamIdentifierPrefix)com.takasub5.MyVoice`)を付ける。新しいほう(`TermStore.updatedAt`)が勝ち、初回だけ両方の語を合わせる。キーボードは同期せず、共有Keychainを読むだけ
 - キーボードの歯車は `myvoice://` でアプリを開く(レスポンダチェーンのUIApplicationに開かせる)
+- Claude Codeからの辞書登録: Mac版は `myvoice-mac://add-term?wrong=…&right=…`(組を並べてまとめて可)で `TermStore.upsert` し、一番上に置く(同じ誤変換は上書き)。iCloudでiPhoneへ同期。スキルの正本は `~/.claude/skills/myvoice-dictionary/SKILL.md`、公開用の写しが `claude-skills/`
 - Mac版はログイン時に自動で起動する(初回起動で `SMAppService.mainApp.register()`、メニューの「Macの起動時に開く」で切り替え)
 - Mac版のマイク: メニューで選んだマイクを、録音のたびにシステムの入力にする(AirPodsをつなぐと入力が勝手に変わるため、`Mac/AudioInput.swift`)。HUDとキーボードにマイク名の札を出し、AirPodsならオレンジ
 - APIキー・用語辞書・今月の使用量は**共有Keychain**(`$(AppIdentifierPrefix)com.takasub5.MyVoice.shared`)に置く。App Groupは使っていない(下記)

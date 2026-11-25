@@ -108,6 +108,21 @@ enum TermStore {
         SharedKeychain.set(withUnsafeBytes(of: updatedAt.timeIntervalSince1970) { Data($0) }, "terms-updated")
     }
 
+    /// 語を足す(Claude Codeなど外からの登録用)。同じ誤変換・同じ表記があれば直して一番上へ移す。
+    /// 上にある語ほど認識のヒントとして優先されるので、新しく教えた語は上に置く
+    @discardableResult
+    static func upsert(wrong: String, right: String) -> Term? {
+        let wrong = wrong.trimmingCharacters(in: .whitespacesAndNewlines)
+        let right = right.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !right.isEmpty, wrong != right else { return nil }
+        var terms = load()
+        terms.removeAll { (!wrong.isEmpty && $0.wrong == wrong) || ($0.wrong == wrong && $0.right == right) }
+        let term = Term(wrong: wrong, right: right)
+        terms.insert(term, at: 0)
+        save(terms)
+        return term
+    }
+
     /// この端末の辞書を最後に変えた時刻(同期で新しいほうを残すために使う)
     static var updatedAt: Date {
         guard let data = SharedKeychain.data("terms-updated"), data.count == 8 else { return .distantPast }

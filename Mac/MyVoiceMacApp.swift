@@ -29,6 +29,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         Task { @MainActor in DictationController.shared.start() }
     }
+
+    /// myvoice-mac://add-term?wrong=…&right=…(組を並べると、まとめて足せる)
+    func application(_ application: NSApplication, open urls: [URL]) {
+        Task { @MainActor in
+            for url in urls { DictationController.shared.handle(url) }
+        }
+    }
 }
 
 private struct MenuContent: View {
