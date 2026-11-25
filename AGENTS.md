@@ -11,7 +11,7 @@ Claude Code・Codexの共通ルール。自分専用の音声入力。iPhone・i
 - 認識する言語は「自動/日本語/英語」(`SpeechLanguage`、既定は自動)。自動のときはGroqに `language` を渡さず、`prompt` も用語だけにする(日本語の文を入れると英語の発話もカタカナになりやすい)。iPhoneはキーボードの下の段のボタン、Macはメニューで切り替える。整形モードは、翻訳のモード以外では元の言語のまま整える
 - マイクの選び方(iPhone): キーボードのマイクボタンの左で「自動/本体」を切り替える(`MicPreference`)。本体のときは、WebKitの `enumerateDevices` から名前に iPhone などを含むマイクを選んで録音し直す。選べなければ、つないでいるマイクのまま録音する。外を歩くとき用(本人)。キーボードの中で切り替えが効くかは実機で要確認
 - 辞書は上の語ほど優先。Groqの `prompt`(224トークン)に入るのは上から180文字分だけで、アプリでは「ヒント」の印を付けて見せる(`TermStore.hintWords`)。並べ替えは「編集」から
-- 辞書の同期: iCloud Driveの `マイ音声入力/dictionary.json` を読み書きする(`SharedUI/DictionarySync.swift`)。Xcodeにアカウントがなく、iCloudの権限が付いたプロファイルを作れないため、ふつうのファイルにした。Macは直接、iPhoneはアプリで一度フォルダを選んでブックマークで覚える。新しいほう(`TermStore.updatedAt`)が勝つ。初回だけ両方の語を合わせる
+- 辞書の同期: iCloudのキー値ストア(`NSUbiquitousKeyValueStore`、`SharedUI/DictionarySync.swift`)。iPhoneアプリとMac版に同じ `com.apple.developer.ubiquity-kvstore-identifier`(`$(TeamIdentifierPrefix)com.takasub5.MyVoice`)を付ける。新しいほう(`TermStore.updatedAt`)が勝ち、初回だけ両方の語を合わせる。キーボードは同期せず、共有Keychainを読むだけ
 - キーボードの歯車は `myvoice://` でアプリを開く(レスポンダチェーンのUIApplicationに開かせる)
 - Mac版はログイン時に自動で起動する(初回起動で `SMAppService.mainApp.register()`、メニューの「Macの起動時に開く」で切り替え)
 - Mac版のマイク: メニューで選んだマイクを、録音のたびにシステムの入力にする(AirPodsをつなぐと入力が勝手に変わるため、`Mac/AudioInput.swift`)。HUDとキーボードにマイク名の札を出し、AirPodsならオレンジ
@@ -31,10 +31,10 @@ xcrun devicectl device install app --device 00008160-000A03A000214036 build/Buil
 - Caps LockはKarabiner-ElementsでF18(キーコード79)にしてある。F18は以前Codex(ChatGPT.app、`com.openai.codex`)の音声入力(`globalDictationHold`)に使っていたが、2026-11-25に本人の許可で `~/.codex/keybindings.json` の割り当てを外した(バックアップ `keybindings.json.bak-2026-11-25`)。マイ音声入力はCodexを含むすべてのアプリで動く。「Codexが前面のときは任せる」設定は既定でオフ。Codexは起動時にしか `keybindings.json` を読まないので、割り当てを変えたらCodexを再起動する(しないとCaps LockでCodexが動き続ける)
 - 右Commandは本人がAキーに割り当てている。ショートカットに使わない
 - 録音は `AVAudioRecorder` で16kHzのWAV。キーの監視は `NSEvent` のグローバルモニタ。マイクとアクセシビリティの許可が要る
-- 署名はプロファイルなしの開発用証明書(`CODE_SIGN_STYLE: Manual`)。サンドボックスなし。辞書・APIキーはこのMacのKeychain(iPhoneとはまだ同期しない)
+- 署名はiCloudのためプロファイル付きの自動署名。このMac(Mac mini)は開発用に登録済み(初回は `-allowProvisioningDeviceRegistration` が要った)。サンドボックスなし。辞書・APIキーはこのMacのKeychain(iPhoneとはまだ同期しない)
 - 入れ方:
 ```bash
-xcodebuild -project MyVoice.xcodeproj -scheme MyVoiceMac -destination 'platform=macOS' -derivedDataPath build build
+xcodebuild -project MyVoice.xcodeproj -scheme MyVoiceMac -destination 'platform=macOS' -derivedDataPath build -allowProvisioningUpdates build
 ditto "build/Build/Products/Debug/マイ音声入力.app" "/Applications/マイ音声入力.app"
 ```
 

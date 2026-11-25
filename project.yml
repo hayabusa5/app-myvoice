@@ -37,6 +37,8 @@ targets:
       path: App/MyVoice.entitlements
       properties:
         keychain-access-groups: [$(AppIdentifierPrefix)com.takasub5.MyVoice.shared]
+        # iPhoneとMacで辞書を同期する(iCloudのキー値ストア。Mac版も同じIDを使う)
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.takasub5.MyVoice
     dependencies:
       - target: MyVoiceKeyboard
         embed: true
@@ -81,6 +83,10 @@ targets:
       - Mac
       - Shared
       - SharedUI
+    entitlements:
+      path: Mac/MyVoiceMac.entitlements
+      properties:
+        com.apple.developer.ubiquity-kvstore-identifier: $(TeamIdentifierPrefix)com.takasub5.MyVoice
     info:
       path: Mac/Info.plist
       properties:
@@ -92,11 +98,8 @@ targets:
         PRODUCT_NAME: マイ音声入力
         PRODUCT_BUNDLE_IDENTIFIER: com.takasub5.MyVoice.mac
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        # 自分のMacで動かすだけなので、プロファイルなしで開発用証明書で署名する
-        # (署名が変わらないので、アクセシビリティの許可が更新後も残る)
-        CODE_SIGN_STYLE: Manual
-        CODE_SIGN_IDENTITY: Apple Development
-        PROVISIONING_PROFILE_SPECIFIER: ""
+        # iCloud(辞書の同期)を使うので、プロファイル付きの自動署名にする
+        CODE_SIGN_STYLE: Automatic
         ENABLE_HARDENED_RUNTIME: NO
 schemes:
   MyVoice:

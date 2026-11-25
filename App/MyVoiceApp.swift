@@ -54,7 +54,6 @@ struct ContentView: View {
     @State private var usage = UsageStore.thisMonth()
     @State private var modes = ModeStore.load()
     @ObservedObject private var sync = DictionarySync.shared
-    @State private var pickingSyncFolder = false
     @State private var keyboardAdded = KeyboardStatus.isAdded
     @State private var keyboardFullAccess = KeyboardStatus.hasFullAccess
     @Environment(\.scenePhase) private var scenePhase
@@ -240,28 +239,16 @@ struct ContentView: View {
                 }
 
                 Section {
-                    if sync.isConfigured {
-                        HStack {
-                            Label(syncText, systemImage: sync.lastError == nil ? "icloud" : "exclamationmark.icloud")
-                                .foregroundStyle(sync.lastError == nil ? Color.primary : Color.orange)
-                            Spacer()
-                            Button("今すぐ") { sync.sync() }.buttonStyle(.borderless)
-                        }
-                        Button("同期をやめる", role: .destructive) { sync.forgetFolder() }
-                    } else {
-                        Button {
-                            pickingSyncFolder = true
-                        } label: {
-                            Label("同期するフォルダを選ぶ", systemImage: "icloud.and.arrow.up")
-                        }
+                    HStack {
+                        Label(syncText, systemImage: sync.lastError == nil ? "icloud" : "exclamationmark.icloud")
+                            .foregroundStyle(sync.lastError == nil ? Color.primary : Color.orange)
+                        Spacer()
+                        Button("今すぐ") { sync.sync() }.buttonStyle(.borderless)
                     }
                 } header: {
                     Text("Macと辞書を同期")
                 } footer: {
-                    Text("iCloud Driveの「\(DictionarySync.folderName)」フォルダを選んでください(Mac版が作ります)。最後に変えたほうの辞書が残ります。最初の同期では、両方の語を合わせます。")
-                }
-                .fileImporter(isPresented: $pickingSyncFolder, allowedContentTypes: [.folder]) { result in
-                    if case let .success(url) = result { sync.setFolder(url) }
+                    Text("iCloudで、Mac版と自動で同期します。最後に変えたほうの辞書が残ります。最初の同期では、両方の語を合わせます。")
                 }
 
                 Section {

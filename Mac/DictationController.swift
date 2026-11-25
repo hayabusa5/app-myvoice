@@ -63,9 +63,9 @@ final class DictationController: ObservableObject {
 
     func start() {
         requestPermissions()
-        // 辞書をiCloud Drive経由でiPhoneと同期する(起動時と30秒ごと)
+        // 辞書をiCloudでiPhoneと同期する(届いた変更は通知で取り込む。念のため5分ごとにも)
         DictionarySync.shared.sync()
-        syncTimer = Timer.scheduledTimer(withTimeInterval: 30, repeats: true) { _ in
+        syncTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { _ in
             Task { @MainActor in DictionarySync.shared.sync() }
         }
         let handler: (NSEvent) -> Void = { [weak self] event in

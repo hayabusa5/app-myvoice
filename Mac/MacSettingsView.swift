@@ -120,7 +120,7 @@ private struct DictionaryTab: View {
                     Button("今すぐ同期") { sync.sync() }
                 }
             } footer: {
-                Text("iCloud Driveの「\(DictionarySync.folderName)」フォルダを通して、iPhoneと辞書を同期します。最後に変えたほうの辞書が残ります。iPhoneでは、アプリの「用語辞書」でこのフォルダを一度選んでください。")
+                Text("iCloudで、iPhoneと辞書を自動で同期します。最後に変えたほうの辞書が残ります。")
             }
 
             Section {
@@ -165,7 +165,6 @@ private struct DictionaryTab: View {
 private extension DictionaryTab {
     var syncText: String {
         if let error = sync.lastError { return error }
-        if !sync.isConfigured { return "iCloud Driveがオフです" }
         guard let date = sync.lastSynced else { return "まだ同期していません" }
         return "同期しました(\(date.formatted(date: .omitted, time: .shortened)))"
     }
