@@ -1,0 +1,333 @@
+import AVFoundation
+import UIKit
+
+/// マイクボタンで話す → Groqで文字起こし → 辞書で直す → カーソル位置に入力する キーボード。
+final class KeyboardViewController: UIInputViewController {
+    private let capture = WebAudioCapture()
+    private var pcm = Data()
+    /// 送信に失敗した録音(「再送」で使う)
+    private var failedPCM: Data?
+    private var isTranscribing = false
+    private var modes = ModeStore.load()
+    private var selectedMode: FormatMode = ModeStore.selected(in: ModeStore.load())
+    private let modeRow = UIStackView()
+
+    private let statusLabel = UILabel()
+    private let micButton = UIButton(type: .system)
+    private let retryButton = UIButton(type: .system)
+    private let globeButton = UIButton(type: .system)
+    private var deleteTimer: Timer?
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        configureView()
+        reloadModes()
+        capture.onReady = { [weak self] in self?.render() }
+        capture.onStarted = { [weak self] in self?.setStatus("聞いています…もう一度押すと終了") }
+        capture.onAudio = { [weak self] data, rms in self?.append(data, rms: rms) }
+        capture.onEnded = { [weak self] reason in self?.captureEnded(reason) }
+        capture.attach(to: view)
+        render()
+    }
+
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        reloadModes()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        if capture.isCapturing { capture.stop() }
+    }
+
+    deinit {
+        MainActor.assumeIsolated { capture.tearDown() }
+    }
+
+    // MARK: - 録音
+
+    @objc private func micTapped() {
+        if capture.isCapturing { capture.stop(); return }
+        guard !isTranscribing else { return }
+        guard hasFullAccess else {
+            return setStatus("設定でこのキーボードの「フルアクセスを許可」をオンにしてください")
+        }
+        guard AVAudioApplication.shared.recordPermission == .granted else {
+            return setStatus("マイ音声入力アプリを開いて、マイクを許可してください")
+        }
+        guard APIKeyStore.load() != nil else {
+            return setStatus(GroqError.noAPIKey.errorDescription ?? "")
+        }
+        pcm = Data()
+        failedPCM = nil
+        capture.start()
+        setStatus("マイクを準備中…")
+        render()
+    }
+
+    private func append(_ data: Data, rms: Float) {
+        pcm.append(data)
+        let seconds = Double(pcm.count / 2) / WebAudioCapture.sampleRate
+        let level = String(repeating: "▮", count: min(Int(rms * 60), 10))
+        setStatus(String(format: "録音中 %.1f秒 %@", seconds, level))
+        micButton.alpha = 0.6 + CGFloat(min(rms * 8, 0.4))
+    }
+
+    private func captureEnded(_ reason: String) {
+        render()
+        let audio = pcm
+        pcm = Data()
+        if reason != "stopped" && audio.isEmpty {
+            return setStatus("録音できませんでした: \(reason)")
+        }
+        transcribe(audio)
+    }
+
+    private func transcribe(_ audio: Data) {
+        let seconds = Double(audio.count / 2) / WebAudioCapture.sampleRate
+        guard seconds >= 0.5 else { return setStatus("短すぎました。もう一度どうぞ") }
+        guard let apiKey = APIKeyStore.load() else { return setStatus(GroqError.noAPIKey.errorDescription ?? "") }
+
+        isTranscribing = true
+        render()
+        setStatus("文字にしています…")
+        let terms = TermStore.load()
+        let mode = selectedMode
+        Task { @MainActor in
+            defer { isTranscribing = false; render() }
+            do {
+                let raw = try await GroqClient.transcribe(
+                    wav: WAV.make(pcm: audio), apiKey: apiKey, prompt: TermStore.prompt(for: terms)
+                )
+                UsageStore.add(seconds: seconds)
+                let text = TermStore.apply(terms, to: GroqClient.clean(raw))
+                guard !text.isEmpty else { return setStatus("声が聞き取れませんでした") }
+                guard mode.usesAI else {
+                    textDocumentProxy.insertText(text)
+                    return setStatus("入力しました(\(String(format: "%.1f", seconds))秒)")
+                }
+                setStatus("「\(mode.name)」で整えています…")
+                do {
+                    let formatted = try await TextFormatter.format(text, mode: mode, terms: terms, apiKey: apiKey)
+                    textDocumentProxy.insertText(formatted.isEmpty ? text : TermStore.apply(terms, to: formatted))
+                    setStatus("「\(mode.name)」で入力しました")
+                } catch {
+                    // 整形に失敗しても、話した言葉は失わない
+                    textDocumentProxy.insertText(text)
+                    setStatus("整形できなかったので、そのまま入れました")
+                }
+            } catch {
+                failedPCM = audio
+                setStatus((error as? LocalizedError)?.errorDescription ?? error.localizedDescription)
+            }
+        }
+    }
+
+    @objc private func retryTapped() {
+        guard let audio = failedPCM else { return }
+        failedPCM = nil
+        transcribe(audio)
+    }
+
+    // MARK: - モード
+
+    private func reloadModes() {
+        modes = ModeStore.load()
+        selectedMode = ModeStore.selected(in: modes)
+        modeRow.arrangedSubviews.forEach { $0.removeFromSuperview() }
+        for (index, mode) in modes.enumerated() {
+            var config = mode.id == selectedMode.id ? UIButton.Configuration.filled() : UIButton.Configuration.gray()
+            config.title = mode.name
+            config.cornerStyle = .capsule
+            config.buttonSize = .medium
+            if mode.id != selectedMode.id { config.baseForegroundColor = .label }
+            let button = UIButton(configuration: config)
+            button.tag = index
+            button.addTarget(self, action: #selector(modeTapped(_:)), for: .touchUpInside)
+            modeRow.addArrangedSubview(button)
+        }
+    }
+
+    @objc private func modeTapped(_ sender: UIButton) {
+        guard modes.indices.contains(sender.tag) else { return }
+        ModeStore.select(modes[sender.tag])
+        reloadModes()
+        setStatus(selectedMode.usesAI ? "「\(selectedMode.name)」: 話したあとAIで整えます" : "そのまま入力します")
+    }
+
+    // MARK: - キー
+
+    @objc private func insert(_ sender: UIButton) {
+        guard let text = sender.accessibilityValue else { return }
+        textDocumentProxy.insertText(text)
+    }
+
+    @objc private func deleteDown() {
+        textDocumentProxy.deleteBackward()
+        deleteTimer?.invalidate()
+        deleteTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
+            self?.deleteTimer = Timer.scheduledTimer(withTimeInterval: 0.08, repeats: true) { [weak self] _ in
+                self?.textDocumentProxy.deleteBackward()
+            }
+        }
+    }
+
+    @objc private func dismissTapped() {
+        if capture.isCapturing { capture.stop() }
+        dismissKeyboard()
+    }
+
+    @objc private func deleteUp() {
+        deleteTimer?.invalidate()
+        deleteTimer = nil
+    }
+
+    // MARK: - 画面
+
+    private func configureView() {
+        let height = view.heightAnchor.constraint(equalToConstant: 232)
+        height.priority = .defaultHigh
+        height.isActive = true
+
+        statusLabel.font = .preferredFont(forTextStyle: .footnote)
+        statusLabel.textColor = .secondaryLabel
+        statusLabel.textAlignment = .center
+        statusLabel.numberOfLines = 1
+        statusLabel.adjustsFontSizeToFitWidth = true
+
+        var micConfig = UIButton.Configuration.filled()
+        micConfig.cornerStyle = .capsule
+        micConfig.image = UIImage(systemName: "mic.fill")
+        micConfig.imagePadding = 8
+        micButton.configuration = micConfig
+        micButton.addTarget(self, action: #selector(micTapped), for: .touchUpInside)
+
+        var retryConfig = UIButton.Configuration.tinted()
+        retryConfig.title = "再送"
+        retryConfig.image = UIImage(systemName: "arrow.clockwise")
+        retryButton.configuration = retryConfig
+        retryButton.addTarget(self, action: #selector(retryTapped), for: .touchUpInside)
+
+        globeButton.setImage(UIImage(systemName: "globe"), for: .normal)
+        globeButton.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
+
+        let deleteButton = keyButton(image: "delete.left")
+        deleteButton.addTarget(self, action: #selector(deleteDown), for: .touchDown)
+        deleteButton.addTarget(self, action: #selector(deleteUp), for: [.touchUpInside, .touchUpOutside, .touchCancel])
+
+        let dismissButton = keyButton(image: "keyboard.chevron.compact.down")
+        dismissButton.accessibilityLabel = "キーボードを閉じる"
+        dismissButton.addTarget(self, action: #selector(dismissTapped), for: .touchUpInside)
+
+        let bottomRow = UIStackView(arrangedSubviews: [
+            globeButton,
+            textKey("、"), textKey("。"), textKey("？"),
+            textKey("空白", insert: " "),
+            deleteButton,
+            textKey("改行", insert: "\n"),
+            dismissButton,
+        ])
+        bottomRow.spacing = 6
+        bottomRow.distribution = .fillProportionally
+
+        let micRow = UIStackView(arrangedSubviews: [micButton, retryButton])
+        micRow.spacing = 8
+
+        modeRow.spacing = 6
+        modeRow.translatesAutoresizingMaskIntoConstraints = false
+        let modeScroll = ButtonScrollView()
+        modeScroll.showsHorizontalScrollIndicator = false
+        modeScroll.delaysContentTouches = false
+        if #available(iOS 26.0, *) {
+            // 低い横スクロールだとiOS 26の端のぼかしが全体にかかり、ボタンが見えなくなる
+            modeScroll.topEdgeEffect.isHidden = true
+            modeScroll.bottomEdgeEffect.isHidden = true
+            modeScroll.leftEdgeEffect.isHidden = true
+            modeScroll.rightEdgeEffect.isHidden = true
+        }
+        modeScroll.addSubview(modeRow)
+        NSLayoutConstraint.activate([
+            modeRow.topAnchor.constraint(equalTo: modeScroll.contentLayoutGuide.topAnchor),
+            modeRow.bottomAnchor.constraint(equalTo: modeScroll.contentLayoutGuide.bottomAnchor),
+            modeRow.leadingAnchor.constraint(equalTo: modeScroll.contentLayoutGuide.leadingAnchor),
+            modeRow.trailingAnchor.constraint(equalTo: modeScroll.contentLayoutGuide.trailingAnchor),
+            modeRow.heightAnchor.constraint(equalTo: modeScroll.frameLayoutGuide.heightAnchor),
+            modeScroll.heightAnchor.constraint(equalToConstant: 36),
+        ])
+
+        let stack = UIStackView(arrangedSubviews: [statusLabel, modeScroll, micRow, bottomRow])
+        stack.axis = .vertical
+        stack.spacing = 8
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        view.addSubview(stack)
+
+        let margins = view.layoutMarginsGuide
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: margins.topAnchor, constant: 2),
+            stack.leadingAnchor.constraint(equalTo: margins.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: margins.trailingAnchor),
+            // 下に詰めて、親指の届く位置にキーを置く
+            stack.bottomAnchor.constraint(equalTo: margins.bottomAnchor),
+            micButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 56),
+            bottomRow.heightAnchor.constraint(equalToConstant: 46),
+            globeButton.widthAnchor.constraint(equalToConstant: 40),
+        ])
+    }
+
+    private func textKey(_ title: String, insert: String? = nil) -> UIButton {
+        let button = keyButton(title: title)
+        button.accessibilityValue = insert ?? title
+        button.addTarget(self, action: #selector(insert(_:)), for: .touchUpInside)
+        return button
+    }
+
+    private func keyButton(title: String? = nil, image: String? = nil) -> UIButton {
+        var config = UIButton.Configuration.gray()
+        config.title = title
+        config.image = image.flatMap { UIImage(systemName: $0) }
+        config.baseForegroundColor = .label
+        config.contentInsets = NSDirectionalEdgeInsets(top: 4, leading: 6, bottom: 4, trailing: 6)
+        let button = UIButton(configuration: config)
+        if let title { button.accessibilityLabel = title }
+        return button
+    }
+
+    private func render() {
+        globeButton.isHidden = !needsInputModeSwitchKey
+        retryButton.isHidden = failedPCM == nil || capture.isCapturing || isTranscribing
+
+        var config = micButton.configuration ?? .filled()
+        if capture.isCapturing {
+            config.title = "終了"
+            config.image = UIImage(systemName: "stop.fill")
+            config.baseBackgroundColor = .systemRed
+            micButton.isEnabled = true
+        } else if isTranscribing {
+            micButton.alpha = 1
+            config.title = "処理中"
+            config.image = UIImage(systemName: "ellipsis")
+            config.baseBackgroundColor = .systemGray
+            micButton.isEnabled = false
+        } else {
+            micButton.alpha = 1
+            config.title = capture.isReady ? "話す" : "準備中…"
+            config.image = UIImage(systemName: "mic.fill")
+            config.baseBackgroundColor = capture.isReady ? .systemBlue : .systemGray
+            micButton.isEnabled = capture.isReady
+            if statusLabel.text == nil { setStatus("「話す」を押して話してください。アプリは切り替わりません") }
+        }
+        micButton.configuration = config
+    }
+
+    private func setStatus(_ text: String) {
+        statusLabel.text = text
+    }
+}
+
+/// ボタンの上から指を動かしても横スクロールできるスクロールビュー。
+/// (標準では、ボタンの上で始まったドラッグはスクロールにならない)
+final class ButtonScrollView: UIScrollView {
+    override func touchesShouldCancel(in view: UIView) -> Bool {
+        view is UIControl ? true : super.touchesShouldCancel(in: view)
+    }
+}

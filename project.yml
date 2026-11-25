@@ -1,0 +1,78 @@
+# XcodeGen の設定。`xcodegen generate` で MyVoice.xcodeproj ができる。
+name: MyVoice
+options:
+  bundleIdPrefix: com.takasub5
+  deploymentTarget:
+    iOS: "17.0"
+  developmentLanguage: ja
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1"
+    CURRENT_PROJECT_VERSION: "1"
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: BLLFXPJGG7
+targets:
+  MyVoice:
+    type: application
+    platform: iOS
+    sources:
+      - App
+      - Shared
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: マイ音声入力
+        AppIdentifierPrefix: $(AppIdentifierPrefix)
+        NSMicrophoneUsageDescription: キーボードで話した声を文字にするために使います。
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+    entitlements:
+      path: App/MyVoice.entitlements
+      properties:
+        keychain-access-groups: [$(AppIdentifierPrefix)com.takasub5.MyVoice.shared]
+    dependencies:
+      - target: MyVoiceKeyboard
+        embed: true
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.takasub5.MyVoice
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+  MyVoiceKeyboard:
+    type: app-extension
+    platform: iOS
+    sources:
+      - Keyboard
+      - Shared
+    info:
+      path: Keyboard/Info.plist
+      properties:
+        CFBundleDisplayName: マイ音声入力
+        AppIdentifierPrefix: $(AppIdentifierPrefix)
+        NSMicrophoneUsageDescription: キーボードで話した声を文字にするために使います。
+        NSExtension:
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: $(PRODUCT_MODULE_NAME).KeyboardViewController
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: ja-JP
+            RequestsOpenAccess: true
+    entitlements:
+      path: Keyboard/MyVoiceKeyboard.entitlements
+      properties:
+        keychain-access-groups: [$(AppIdentifierPrefix)com.takasub5.MyVoice.shared]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.takasub5.MyVoice.Keyboard
+        TARGETED_DEVICE_FAMILY: "1,2"
+        APPLICATION_EXTENSION_API_ONLY: YES
+schemes:
+  MyVoice:
+    build:
+      targets:
+        MyVoice: all
+        MyVoiceKeyboard: all
+    run:
+      config: Debug
