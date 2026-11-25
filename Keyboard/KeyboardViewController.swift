@@ -41,6 +41,8 @@ final class KeyboardViewController: UIInputViewController {
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         reloadModes()
+        // フルアクセスがあるときだけ共有Keychainに書ける。アプリの「準備」の印に使う
+        if hasFullAccess, !KeyboardStatus.hasFullAccess { KeyboardStatus.hasFullAccess = true }
         languageButton.configuration?.title = SpeechLanguage.current.shortLabel
     }
 

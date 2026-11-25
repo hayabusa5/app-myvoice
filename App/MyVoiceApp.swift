@@ -53,6 +53,8 @@ struct ContentView: View {
     @State private var testText = ""
     @State private var usage = UsageStore.thisMonth()
     @State private var modes = ModeStore.load()
+    @State private var keyboardAdded = KeyboardStatus.isAdded
+    @State private var keyboardFullAccess = KeyboardStatus.hasFullAccess
     @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
@@ -110,13 +112,28 @@ struct ContentView: View {
                         }
                     }
                     VStack(alignment: .leading, spacing: 6) {
-                        Label("キーボードを追加", systemImage: "keyboard")
-                        Text("設定 → 一般 → キーボード → キーボード → 新しいキーボードを追加 → マイ音声入力。そのあと「マイ音声入力」を開いて「フルアクセスを許可」をオンにします。")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        Button("このアプリの設定を開く") {
-                            if let url = URL(string: UIApplication.openSettingsURLString) {
-                                UIApplication.shared.open(url)
+                        HStack {
+                            Label("キーボード", systemImage: keyboardAdded ? "checkmark.circle.fill" : "keyboard")
+                            Spacer()
+                            Text(keyboardAdded ? "追加済み" : "未追加").foregroundStyle(.secondary)
+                        }
+                        if keyboardAdded {
+                            HStack {
+                                Label("フルアクセス", systemImage: keyboardFullAccess ? "checkmark.circle.fill" : "lock.open")
+                                Spacer()
+                                Text(keyboardFullAccess ? "許可済み" : "未確認").foregroundStyle(.secondary)
+                            }
+                        }
+                        if !keyboardAdded || !keyboardFullAccess {
+                            Text(keyboardAdded
+                                 ? "「フルアクセスを許可」をオンにして、下の欄でこのキーボードを一度開くと確認できます。"
+                                 : "設定 → 一般 → キーボード → キーボード → 新しいキーボードを追加 → マイ音声入力。そのあと「マイ音声入力」を開いて「フルアクセスを許可」をオンにします。")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            Button("このアプリの設定を開く") {
+                                if let url = URL(string: UIApplication.openSettingsURLString) {
+                                    UIApplication.shared.open(url)
+                                }
                             }
                         }
                     }
@@ -234,9 +251,18 @@ struct ContentView: View {
             .scrollDismissesKeyboard(.immediately)
             .toolbar { EditButton() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UITextInputMode.currentInputModeDidChangeNotification)) { _ in
+            // 試す欄でこのキーボードに切り替えたら、印を付け直す(キーボード側の書き込みを少し待つ)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                keyboardAdded = KeyboardStatus.isAdded
+                keyboardFullAccess = KeyboardStatus.hasFullAccess
+            }
+        }
         .onChange(of: scenePhase) { _, phase in
             guard phase == .active else { return }
             micGranted = AVAudioApplication.shared.recordPermission == .granted
+            keyboardAdded = KeyboardStatus.isAdded
+            keyboardFullAccess = KeyboardStatus.hasFullAccess
             usage = UsageStore.thisMonth()
             modes = ModeStore.load()
             terms = TermStore.load()

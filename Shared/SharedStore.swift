@@ -267,3 +267,23 @@ enum MicPreference {
         set { SharedKeychain.set(Data([newValue ? 1 : 0]), key) }
     }
 }
+
+#if os(iOS)
+/// キーボードを追加済みか、フルアクセスが付いているか(アプリの「準備」の印に使う)
+enum KeyboardStatus {
+    static let bundleID = "com.takasub5.MyVoice.Keyboard"
+    private static let fullAccessKey = "keyboard-full-access"
+
+    /// 設定で追加済みのキーボードの一覧に入っているか
+    static var isAdded: Bool {
+        let keyboards = UserDefaults.standard.object(forKey: "AppleKeyboards") as? [String] ?? []
+        return keyboards.contains(bundleID)
+    }
+
+    /// キーボードが最後に開いたとき、フルアクセスが付いていたか(キーボード側が書く)
+    static var hasFullAccess: Bool {
+        get { SharedKeychain.data(fullAccessKey) == Data([1]) }
+        set { SharedKeychain.set(Data([newValue ? 1 : 0]), fullAccessKey) }
+    }
+}
+#endif
