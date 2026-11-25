@@ -16,6 +16,11 @@ final class KeyboardViewController: UIInputViewController {
     private var statusText: String?
     private var statusClearTask: Task<Void, Never>?
     private let micButton = UIButton(type: .system)
+    /// 録音中だけ「話す」ボタンの上に出す: 停止の印・波形・秒数
+    private let recordingOverlay = UIStackView()
+    private let waveform = WaveformView()
+    private let timeLabel = UILabel()
+    private var deviceLabel: String?
     private let retryButton = UIButton(type: .system)
     private let micSourceButton = UIButton(type: .system)
     private let globeButton = UIButton(type: .system)
@@ -27,12 +32,16 @@ final class KeyboardViewController: UIInputViewController {
         configureView()
         reloadModes()
         capture.onReady = { [weak self] in self?.render() }
-        capture.onStarted = { [weak self] in self?.setStatus("聞いています…もう一度押すと終了") }
+        capture.onStarted = { [weak self] in
+            self?.statusText = nil
+            self?.render()
+        }
         capture.onAudio = { [weak self] data, rms in self?.append(data, rms: rms) }
         capture.onEnded = { [weak self] reason in self?.captureEnded(reason) }
         capture.onDevice = { [weak self] label in
             guard let self, !label.isEmpty else { return }
-            self.setStatus("聞いています(\(label))…もう一度押すと終了")
+            self.deviceLabel = label
+            self.updateTimeLabel(seconds: 0)
         }
         capture.attach(to: view)
         render()
@@ -71,6 +80,9 @@ final class KeyboardViewController: UIInputViewController {
         }
         pcm = Data()
         failedPCM = nil
+        deviceLabel = nil
+        waveform.reset()
+        updateTimeLabel(seconds: 0)
         capture.start(preferBuiltInMic: MicPreference.preferBuiltIn)
         setStatus("マイクを準備中…")
         render()
@@ -79,9 +91,13 @@ final class KeyboardViewController: UIInputViewController {
     private func append(_ data: Data, rms: Float) {
         pcm.append(data)
         let seconds = Double(pcm.count / 2) / WebAudioCapture.sampleRate
-        let level = String(repeating: "▮", count: min(Int(rms * 60), 10))
-        setStatus(String(format: "録音中 %.1f秒 %@", seconds, level))
-        micButton.alpha = 0.6 + CGFloat(min(rms * 8, 0.4))
+        waveform.push(rms: rms)
+        updateTimeLabel(seconds: seconds)
+    }
+
+    private func updateTimeLabel(seconds: Double) {
+        let time = String(format: "%.1f秒", seconds)
+        timeLabel.text = deviceLabel.map { "\($0)  \(time)" } ?? time
     }
 
     private func captureEnded(_ reason: String) {
@@ -250,6 +266,31 @@ final class KeyboardViewController: UIInputViewController {
         micButton.configuration = micConfig
         micButton.addTarget(self, action: #selector(micTapped), for: .touchUpInside)
 
+        let stopIcon = UIImageView(image: UIImage(systemName: "stop.fill"))
+        stopIcon.tintColor = .white
+        stopIcon.setContentHuggingPriority(.required, for: .horizontal)
+        timeLabel.font = .monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+        timeLabel.textColor = .white
+        timeLabel.adjustsFontSizeToFitWidth = true
+        timeLabel.minimumScaleFactor = 0.7
+        timeLabel.setContentHuggingPriority(.required, for: .horizontal)
+        timeLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+        waveform.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        [stopIcon, waveform, timeLabel].forEach(recordingOverlay.addArrangedSubview)
+        recordingOverlay.spacing = 10
+        recordingOverlay.alignment = .center
+        recordingOverlay.isUserInteractionEnabled = false
+        recordingOverlay.isHidden = true
+        recordingOverlay.translatesAutoresizingMaskIntoConstraints = false
+        micButton.addSubview(recordingOverlay)
+        NSLayoutConstraint.activate([
+            recordingOverlay.leadingAnchor.constraint(equalTo: micButton.leadingAnchor, constant: 20),
+            recordingOverlay.trailingAnchor.constraint(equalTo: micButton.trailingAnchor, constant: -20),
+            recordingOverlay.topAnchor.constraint(equalTo: micButton.topAnchor, constant: 8),
+            recordingOverlay.bottomAnchor.constraint(equalTo: micButton.bottomAnchor, constant: -8),
+            waveform.heightAnchor.constraint(equalTo: recordingOverlay.heightAnchor),
+        ])
+
         var retryConfig = UIButton.Configuration.tinted()
         retryConfig.title = "再送"
         retryConfig.image = UIImage(systemName: "arrow.clockwise")
@@ -353,9 +394,12 @@ final class KeyboardViewController: UIInputViewController {
         retryButton.isHidden = failedPCM == nil || capture.isCapturing || isTranscribing
 
         var config = micButton.configuration ?? .filled()
+        recordingOverlay.isHidden = !capture.isCapturing
+        micButton.accessibilityLabel = capture.isCapturing ? "録音を終える" : nil
         if capture.isCapturing {
-            config.title = "終了"
-            config.image = UIImage(systemName: "stop.fill")
+            // 文字と印は重ねて出す波形のほうに任せる
+            config.title = nil
+            config.image = nil
             config.baseBackgroundColor = .systemRed
             micButton.isEnabled = true
         } else if isTranscribing {
@@ -371,7 +415,7 @@ final class KeyboardViewController: UIInputViewController {
             config.baseBackgroundColor = capture.isReady ? .systemBlue : .systemGray
             micButton.isEnabled = capture.isReady
         }
-        config.subtitle = statusText
+        config.subtitle = capture.isCapturing ? nil : statusText
         micButton.configuration = config
     }
 

@@ -22,6 +22,15 @@ final class HUDPanel {
         return panel
     }()
 
+    func resetLevels() { model.levels = [] }
+
+    /// 録音の音量(dB、-160〜0)を波形に足す
+    func push(decibels: Float) {
+        let level = CGFloat(min(max((decibels + 50) / 45, 0), 1))
+        model.levels.append(level)
+        if model.levels.count > HUDModel.maxBars { model.levels.removeFirst(model.levels.count - HUDModel.maxBars) }
+    }
+
     func update(phase: DictationController.Phase) {
         switch phase {
         case .idle:
@@ -57,6 +66,8 @@ final class HUDModel: ObservableObject {
     @Published var text = ""
     @Published var startedAt: Date?
     @Published var color: Color = .red
+    @Published var levels: [CGFloat] = []
+    static let maxBars = 36
 }
 
 private struct HUDView: View {
@@ -66,10 +77,12 @@ private struct HUDView: View {
         HStack(spacing: 8) {
             Circle().fill(model.color).frame(width: 10, height: 10)
             if let startedAt = model.startedAt {
+                WaveformBars(levels: model.levels)
                 TimelineView(.periodic(from: .now, by: 0.1)) { context in
-                    Text(String(format: "%@ %.1f秒", model.text, context.date.timeIntervalSince(startedAt)))
+                    Text(String(format: "%.1f秒", context.date.timeIntervalSince(startedAt)))
                         .monospacedDigit()
                 }
+                .frame(width: 52, alignment: .trailing)
             } else {
                 Text(model.text).lineLimit(1).minimumScaleFactor(0.7)
             }
@@ -79,5 +92,23 @@ private struct HUDView: View {
         .padding(.horizontal, 16)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(.black.opacity(0.78), in: Capsule())
+    }
+}
+
+/// 右から流れる棒の波形。右端が最新
+private struct WaveformBars: View {
+    let levels: [CGFloat]
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 2) {
+            ForEach(0..<HUDModel.maxBars, id: \.self) { i in
+                let index = levels.count - HUDModel.maxBars + i
+                let level = index >= 0 ? levels[index] : 0
+                Capsule()
+                    .frame(width: 3, height: max(3, level * 24))
+            }
+        }
+        .frame(height: 24)
+        .animation(.linear(duration: 0.05), value: levels)
     }
 }

@@ -37,6 +37,7 @@ final class DictationController: ObservableObject {
     private var keyIsDown = false
     private let hud = HUDPanel()
     private var messageTask: Task<Void, Never>?
+    private var meterTimer: Timer?
 
     var menuBarIcon: String {
         switch phase {
@@ -118,10 +119,20 @@ final class DictationController: ObservableObject {
         do {
             try? FileManager.default.removeItem(at: recordingURL)
             let recorder = try AVAudioRecorder(url: recordingURL, settings: settings)
+            recorder.isMeteringEnabled = true
             guard recorder.record() else { return show("録音を始められませんでした") }
             self.recorder = recorder
             NSSound(named: "Tink")?.play()
+            hud.resetLevels()
             set(.recording(Date()))
+            // 声の大きさをHUDの波形に流す
+            meterTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
+                Task { @MainActor in
+                    guard let self, let recorder = self.recorder else { return }
+                    recorder.updateMeters()
+                    self.hud.push(decibels: recorder.averagePower(forChannel: 0))
+                }
+            }
         } catch {
             show("録音を始められませんでした: \(error.localizedDescription)")
         }
@@ -130,6 +141,8 @@ final class DictationController: ObservableObject {
     private func stopRecording() {
         guard case let .recording(startedAt) = phase, let recorder else { return }
         let seconds = Date().timeIntervalSince(startedAt)
+        meterTimer?.invalidate()
+        meterTimer = nil
         recorder.stop()
         self.recorder = nil
         guard seconds >= Self.minimumSeconds else { set(.idle); return }
