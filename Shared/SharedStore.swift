@@ -83,8 +83,8 @@ enum TermStore {
         Term(wrong: "テストフライト", right: "TestFlight"),
         Term(wrong: "クラウドキット", right: "CloudKit"),
         Term(wrong: "グロック", right: "Groq"),
-        Term(wrong: "", right: "手首ブザー"),
-        Term(wrong: "", right: "まぶしいひつまぶし"),
+        Term(wrong: "", right: "SwiftUI"),
+        Term(wrong: "", right: "Xcode"),
     ]
 
     static func load() -> [Term] {

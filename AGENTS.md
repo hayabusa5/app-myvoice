@@ -20,8 +20,9 @@ Claude Code・Codexの共通ルール。自分専用の音声入力。iPhone・i
 ## ビルドとインストール
 ```bash
 xcodegen generate
-xcodebuild -project MyVoice.xcodeproj -scheme MyVoice -destination 'id=00008160-000A03A000214036' -derivedDataPath build -allowProvisioningUpdates build
-xcrun devicectl device install app --device 00008160-000A03A000214036 build/Build/Products/Debug-iphoneos/MyVoice.app
+xcrun devicectl list devices   # 本人のiPhone(iPhone 18 Pro)の行のUDIDを使う。公開リポジトリなのでUDIDは書かない
+xcodebuild -project MyVoice.xcodeproj -scheme MyVoice -destination 'id=<UDID>' -derivedDataPath build -allowProvisioningUpdates build
+xcrun devicectl device install app --device <UDID> build/Build/Products/Debug-iphoneos/MyVoice.app
 ```
 - 署名のチームは BLLFXPJGG7。2026-11-25の夜に本人がXcodeへサインインし、コマンドからも新しい権限(iCloudなど)のプロファイルを作れるようになった(それまでは「No Accounts」)ため、ワイルドカードのプロファイルで足りる権限だけにしている。App GroupやCloudKitを足すときは、Xcodeで一度ビルドしてプロファイルを作る
 - TestFlightは、アーカイブを `open` して Organizer から上げる(`-exportArchive` は失敗する)
@@ -52,6 +53,6 @@ ditto "build/Build/Products/Debug/マイ音声入力.app" "/Applications/マイ�
 - `App/Assets.xcassets/AppIcon.appiconset/icon-1024.png`(1024×1024、アルファなし)。変えるときは差し替えるだけでよい
 
 ## GitHub
-- 非公開リポジトリ: https://github.com/hayabusa5/app-myvoice (topic: app)。自動同期はないので、変えたら手動でcommit・pushする
+- 公開リポジトリ(2026-11-25に公開): https://github.com/hayabusa5/app-myvoice (topic: app)。個人情報(端末のUDID・メール・APIキー・個人の辞書)は書かない。自動同期はないので、変えたら手動でcommit・pushする
 - コミットの作成者は既存リポジトリと同じ `Claude <noreply@anthropic.com>`(`git -c user.name=Claude -c user.email=noreply@anthropic.com commit`)
 - `MyVoice.xcodeproj` と `build/` は入れない(`xcodegen generate` で作り直せる)。APIキーはコードに書かない
