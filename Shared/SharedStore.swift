@@ -256,3 +256,14 @@ enum SpeechLanguage: String, CaseIterable, Identifiable {
         set { SharedKeychain.set(Data(newValue.rawValue.utf8), key) }
     }
 }
+
+// MARK: - マイクの選び方(iPhone)
+
+enum MicPreference {
+    private static let key = "prefer-builtin-mic"
+    /// trueなら、AirPodsなどがつながっていてもiPhone本体のマイクで録音する
+    static var preferBuiltIn: Bool {
+        get { SharedKeychain.data(key).map { $0 == Data([1]) } ?? false }
+        set { SharedKeychain.set(Data([newValue ? 1 : 0]), key) }
+    }
+}

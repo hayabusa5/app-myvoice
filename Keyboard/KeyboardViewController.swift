@@ -15,6 +15,7 @@ final class KeyboardViewController: UIInputViewController {
     private let statusLabel = UILabel()
     private let micButton = UIButton(type: .system)
     private let retryButton = UIButton(type: .system)
+    private let micSourceButton = UIButton(type: .system)
     private let globeButton = UIButton(type: .system)
     private lazy var languageButton = keyButton(title: SpeechLanguage.current.shortLabel)
     private var deleteTimer: Timer?
@@ -27,6 +28,10 @@ final class KeyboardViewController: UIInputViewController {
         capture.onStarted = { [weak self] in self?.setStatus("聞いています…もう一度押すと終了") }
         capture.onAudio = { [weak self] data, rms in self?.append(data, rms: rms) }
         capture.onEnded = { [weak self] reason in self?.captureEnded(reason) }
+        capture.onDevice = { [weak self] label in
+            guard let self, !label.isEmpty else { return }
+            self.setStatus("聞いています(\(label))…もう一度押すと終了")
+        }
         capture.attach(to: view)
         render()
     }
@@ -62,7 +67,7 @@ final class KeyboardViewController: UIInputViewController {
         }
         pcm = Data()
         failedPCM = nil
-        capture.start()
+        capture.start(preferBuiltInMic: MicPreference.preferBuiltIn)
         setStatus("マイクを準備中…")
         render()
     }
@@ -175,6 +180,31 @@ final class KeyboardViewController: UIInputViewController {
         }
     }
 
+    @objc private func micSourceTapped() {
+        guard !capture.isCapturing else { return }
+        MicPreference.preferBuiltIn.toggle()
+        updateMicSourceButton()
+        setStatus(MicPreference.preferBuiltIn
+                  ? "マイク: iPhone本体(イヤホンをつないでいても本体で録音)"
+                  : "マイク: つないでいるもの(AirPodsなど)")
+    }
+
+    private func updateMicSourceButton() {
+        var config = UIButton.Configuration.gray()
+        config.image = UIImage(systemName: MicPreference.preferBuiltIn ? "iphone" : "airpods")
+        config.title = MicPreference.preferBuiltIn ? "本体" : "自動"
+        config.imagePlacement = .top
+        config.imagePadding = 2
+        config.baseForegroundColor = .label
+        config.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { attributes in
+            var attributes = attributes
+            attributes.font = .systemFont(ofSize: 11, weight: .medium)
+            return attributes
+        }
+        micSourceButton.configuration = config
+        micSourceButton.accessibilityLabel = MicPreference.preferBuiltIn ? "マイク: iPhone本体" : "マイク: 自動"
+    }
+
     @objc private func languageTapped() {
         let language = SpeechLanguage.current.next
         SpeechLanguage.current = language
@@ -248,7 +278,11 @@ final class KeyboardViewController: UIInputViewController {
         bottomRow.spacing = 6
         bottomRow.distribution = .fillProportionally
 
-        let micRow = UIStackView(arrangedSubviews: [micButton, retryButton])
+        micSourceButton.addTarget(self, action: #selector(micSourceTapped), for: .touchUpInside)
+        micSourceButton.widthAnchor.constraint(equalToConstant: 64).isActive = true
+        updateMicSourceButton()
+
+        let micRow = UIStackView(arrangedSubviews: [micSourceButton, micButton, retryButton])
         micRow.spacing = 8
 
         modeRow.spacing = 6

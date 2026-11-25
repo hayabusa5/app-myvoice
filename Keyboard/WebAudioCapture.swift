@@ -15,6 +15,8 @@ final class WebAudioCapture: NSObject {
     var onStarted: (() -> Void)?
     var onAudio: ((Data, Float) -> Void)?
     var onEnded: ((String) -> Void)?
+    /// 実際に使ったマイクの名前(本体のマイクを選べたかの確認用)
+    var onDevice: ((String) -> Void)?
 
     private(set) var isReady = false
     private(set) var isCapturing = false
@@ -44,13 +46,14 @@ final class WebAudioCapture: NSObject {
         webView.loadHTMLString(Self.page, baseURL: URL(string: "https://keyboard-dictation.invalid/"))
     }
 
-    func start() {
+    /// - Parameter preferBuiltInMic: AirPodsなどがつながっていても、iPhone本体のマイクを選ぶ
+    func start(preferBuiltInMic: Bool = false) {
         guard isReady, !isCapturing else { return }
         isCapturing = true
         heartbeat = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.webView.evaluateJavaScript("captureHeartbeat()") }
         }
-        webView.evaluateJavaScript("startCapture(); 0") { [weak self] _, error in
+        webView.evaluateJavaScript("startCapture(\(preferBuiltInMic)); 0") { [weak self] _, error in
             if let error { Task { @MainActor in self?.finish(reason: "start failed: \(error.localizedDescription)") } }
         }
     }
@@ -84,6 +87,8 @@ final class WebAudioCapture: NSObject {
             onReady?()
         case "started":
             onStarted?()
+        case "device":
+            onDevice?(message["label"] as? String ?? "")
         case "audio":
             guard isCapturing, let base64 = message["data"] as? String, let data = Data(base64Encoded: base64) else { return }
             onAudio?(data, (message["rms"] as? NSNumber)?.floatValue ?? 0)
@@ -108,7 +113,27 @@ final class WebAudioCapture: NSObject {
     window.captureHeartbeat = () => { lastHeartbeat = performance.now(); };
     let stopCapture = () => {};
     window.stopCapture = () => stopCapture();
-    window.startCapture = async () => {
+    // 名前から本体のマイクを探す(AirPodsなどのBluetoothは除く)
+    const builtInPattern = /iphone|ipad|built-in|内蔵/i;
+    const openStream = async (preferBuiltIn) => {
+      const base = { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+      let stream = await navigator.mediaDevices.getUserMedia({ audio: base });
+      if (!preferBuiltIn) return stream;
+      try {
+        const current = stream.getAudioTracks()[0];
+        const devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === 'audioinput');
+        const builtIn = devices.find(d => builtInPattern.test(d.label) && !/airpods|bluetooth|beats/i.test(d.label));
+        if (builtIn && builtIn.deviceId !== current.getSettings().deviceId) {
+          const next = await navigator.mediaDevices.getUserMedia({ audio: { ...base, deviceId: { exact: builtIn.deviceId } } });
+          stream.getTracks().forEach(track => track.stop());
+          stream = next;
+        }
+      } catch (_) {
+        // 選べなかったら、つながっているマイクのまま録音する
+      }
+      return stream;
+    };
+    window.startCapture = async (preferBuiltIn) => {
       let stopping = false, stream, context, source, processor, sink, watchdog;
       const audioSession = navigator.audioSession;
       const previousType = audioSession?.type ?? 'auto';
@@ -127,11 +152,10 @@ final class WebAudioCapture: NSObject {
       stopCapture = cleanup;
       try {
         try { if (audioSession) audioSession.type = 'play-and-record'; } catch (_) {}
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
+        stream = await openStream(preferBuiltIn);
         if (stopping) { stream.getTracks().forEach(track => track.stop()); return; }
         const track = stream.getAudioTracks()[0];
+        post({ type: 'device', label: track.label || '' });
         track.onended = () => interrupted('track-ended');
         // Defer the AudioContext until capture: creating one can take audio focus.
         context = new AudioContext({ latencyHint: 'interactive' });
